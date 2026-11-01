@@ -625,7 +625,7 @@ public class ChannelSyncService
         { "Disney XD",                  ("60006",  "60007") },
         { "Nickelodeon",                ("59432",  "59433") },
         { "Nick Jr.",                   ("82649",  "82650") },
-        { "Nicktoons",                  ("89572",  "89572") },
+        { "Nicktoons",                  ("30420",  "30420") },
         { "TeenNick",                   ("59036",  "59036") },
         { "Cartoon Network",            ("60048",  "60049") },
         { "Discovery Family",           ("67749",  "67749") },

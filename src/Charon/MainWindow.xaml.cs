@@ -52,6 +52,11 @@ public partial class MainWindow : Window
         _tuner = new ChromeTuner(_config);
         _server = new CharonServer(_config, _providers, _tuner, AppendLog);
         _server.TunersChanged += UpdateTunerStatus;
+_server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
+{
+    PopulateUiFromConfig();
+    RefreshProviderDropdown();
+});
 
         GridChannels.ItemsSource = _editableChannels;
 
@@ -782,21 +787,20 @@ public partial class MainWindow : Window
     }
 
     private void AppendLog(string message)
+{
+    string line = $"[{DateTime.Now:HH:mm:ss}] {message}";
+    _server?.RecordLog(line);
+
+    Dispatcher.InvokeAsync(() =>
     {
-        Dispatcher.InvokeAsync(() =>
+        TxtLogs.AppendText($"{line}{Environment.NewLine}");
+        if (TxtLogs.Text.Length > 100000)
         {
-            TxtLogs.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}");
-
-            // Limit the log to roughly 100,000 characters to prevent memory leaks during long uptimes
-            if (TxtLogs.Text.Length > 100000)
-            {
-                // Drop the oldest ~20,000 characters when the limit is reached
-                TxtLogs.Text = TxtLogs.Text.Substring(20000);
-            }
-
-            TxtLogs.ScrollToEnd();
-        });
-    }
+            TxtLogs.Text = TxtLogs.Text.Substring(20000);
+        }
+        TxtLogs.ScrollToEnd();
+    });
+}
 
     #region System Tray Background Support (Run in Background on Close)
 
