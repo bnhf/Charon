@@ -22,7 +22,7 @@ public sealed class ChromeTuner
     private int WindowHeight => _config.Enable1080p ? 1112 : 752;
     private int ViewportWidth => _config.Enable1080p ? 1920 : 1280;
     private int ViewportHeight => _config.Enable1080p ? 1080 : 720;
-    private int VideoBitrate => _config.Enable1080p ? 18000000 : 15000000;
+    private int VideoBitrate => _config.Enable1080p ? 8000000 : 12000000;
 
     public ChromeTuner(CharonConfig config)
     {
@@ -52,8 +52,8 @@ public sealed class ChromeTuner
                 "--no-default-browser-check",
                 "--autoplay-policy=no-user-gesture-required",
                 "--disable-features=HardwareMediaKeyHandling,MediaSessionService,Translate",
-                "--window-position=50,50",     // <-- Forces login window onto your main screen
-                "--window-size=1280,800",       // <-- Sets a clean, comfortable login window size
+                "--window-position=50,50",     
+                "--window-size=1280,800",       
                 $"\"{loginUrl}\""
             ]),
             UseShellExecute = false
@@ -273,14 +273,14 @@ public sealed class ChromeTuner
                 int read = await ffmpegOut.ReadAsync(outBuf, ct);
                 if (read <= 0) break;
 
+                await outputStream.WriteAsync(outBuf.AsMemory(0, read), ct);
+
                 if (!firstTsPacketLogged)
                 {
                     firstTsPacketLogged = true;
+                    await outputStream.FlushAsync(ct);
                     logCallback?.Invoke($"[Tuner {tunerId}] First MPEG-TS packet delivered to Client at +{tuneTimer.Elapsed.TotalSeconds:F1}s!");
                 }
-
-                await outputStream.WriteAsync(outBuf.AsMemory(0, read), ct);
-                await outputStream.FlushAsync(ct);
             }
 
             await listenerTask;
@@ -822,7 +822,7 @@ public sealed class ChromeTuner
                 }
               };
 
-              activeRecorder.start(33);
+              activeRecorder.start(150);
             };
           } catch (err) {
             activeRecorder = null;
