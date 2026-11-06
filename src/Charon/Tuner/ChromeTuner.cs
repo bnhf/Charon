@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -7,6 +8,9 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 using Charon.Config;
 using Charon.Providers;
 
@@ -22,7 +26,7 @@ public sealed class ChromeTuner
     private int WindowHeight => _config.Enable1080p ? 1112 : 752;
     private int ViewportWidth => _config.Enable1080p ? 1920 : 1280;
     private int ViewportHeight => _config.Enable1080p ? 1080 : 720;
-    private int VideoBitrate => _config.Enable1080p ? 8000000 : 12000000;
+    private int VideoBitrate => _config.Enable1080p ? 12000000 : 8000000;
 
     public ChromeTuner(CharonConfig config)
     {
@@ -121,7 +125,7 @@ public sealed class ChromeTuner
             $"--app=\"{channel.Url}\"",
             $"--window-size={WindowWidth},{WindowHeight}",
             "--force-device-scale-factor=1",
-			"--force-color-profile=srgb",
+            "--force-color-profile=srgb",
             "--autoplay-policy=no-user-gesture-required",
             "--enable-gpu-rasterization",
             "--enable-zero-copy",
@@ -192,13 +196,39 @@ public sealed class ChromeTuner
                 catch { }
             }, ct);
 
-            // 3. Accept WebSocket stream connection from offscreen.js
+            // 3. Create bounded memory queue & dedicated FFmpeg stdin writer pump
+            var pipeChannel = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(128)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleWriter = true,
+                SingleReader = true
+            });
+
+            var ffmpegWriterTask = Task.Run(async () =>
+            {
+                try
+                {
+                    Stream ffmpegIn = ffmpegProcess.StandardInput.BaseStream;
+                    await foreach (var chunk in pipeChannel.Reader.ReadAllAsync(ct))
+                    {
+                        await ffmpegIn.WriteAsync(chunk.AsMemory(0, chunk.Length), ct);
+                    }
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or IOException)
+                {
+                }
+                finally
+                {
+                    try { ffmpegProcess.StandardInput.Close(); } catch { }
+                }
+            }, ct);
+
+            // 4. Accept WebSocket stream connection from offscreen.js
             var listenerTask = Task.Run(async () =>
             {
                 try
                 {
                     using var reg = ct.Register(() => { try { httpListener.Stop(); } catch { } });
-                    Stream ffmpegIn = ffmpegProcess.StandardInput.BaseStream;
                     long totalBytesWritten = 0;
 
                     while (!ct.IsCancellationRequested)
@@ -235,7 +265,11 @@ public sealed class ChromeTuner
                                         loggedStart = true;
                                         logCallback?.Invoke($"[Tuner {tunerId}] WebM stream active at +{tuneTimer.Elapsed.TotalSeconds:F1}s -> piping to FFmpeg...");
                                     }
-                                    await ffmpegIn.WriteAsync(buffer.AsMemory(0, result.Count), ct);
+
+                                    byte[] chunk = new byte[result.Count];
+                                    Buffer.BlockCopy(buffer, 0, chunk, 0, result.Count);
+
+                                    await pipeChannel.Writer.WriteAsync(chunk, ct);
                                     totalBytesWritten += result.Count;
                                 }
                             }
@@ -259,11 +293,11 @@ public sealed class ChromeTuner
                 }
                 finally
                 {
-                    try { ffmpegProcess.StandardInput.Close(); } catch { }
+                    pipeChannel.Writer.TryComplete();
                 }
             }, ct);
 
-            // 4. Read FFmpeg's MPEG-TS stdout and flush immediately!
+            // 5. Read FFmpeg's MPEG-TS stdout and flush immediately on first packet
             Stream ffmpegOut = ffmpegProcess.StandardOutput.BaseStream;
             byte[] outBuf = new byte[32768];
             bool firstTsPacketLogged = false;
@@ -284,6 +318,7 @@ public sealed class ChromeTuner
             }
 
             await listenerTask;
+            await ffmpegWriterTask;
         }
         catch (OperationCanceledException)
         {
@@ -311,8 +346,8 @@ public sealed class ChromeTuner
             TryDeleteFile(Path.Combine(tunerProfile, "SingletonLock"));
         }
     }
-	
-	private static string BuildFfmpegArguments()
+
+    private static string BuildFfmpegArguments()
     {
         return string.Join(" ",
         [
@@ -343,7 +378,7 @@ public sealed class ChromeTuner
             IntPtr hwnd = await WaitForChromeWindowAsync(chromeProcessId, ct);
             if (hwnd != IntPtr.Zero)
             {
-                ApplyWindowPlacement(hwnd);
+                ApplyWindowPlacement(hwnd, tunerId);
             }
         }, ct);
 
@@ -367,7 +402,6 @@ public sealed class ChromeTuner
                 await Task.Delay(15, ct);
             }
 
-            // Wait for Chrome's response to Extensions.loadUnpacked before closing the socket!
             if (!string.IsNullOrWhiteSpace(browserWsUrl))
             {
                 using var bws = new ClientWebSocket();
@@ -414,7 +448,6 @@ public sealed class ChromeTuner
                     mobile = false
                 }, ct);
 
-                // Combine fresh StyleCss + TuneJs so CDP always injects the latest CSS even if Chrome cached main_world.js!
                 var cdpScriptBuilder = new StringBuilder();
                 if (!string.IsNullOrWhiteSpace(provider.StyleCss))
                 {
@@ -474,8 +507,6 @@ public sealed class ChromeTuner
                     }
                 }
 
-                // CRITICAL: Keep the CDP WebSocket open for the entire lifetime of the stream!
-                // If 'ws' disposes early, Chrome automatically reverts Emulation.setDeviceMetricsOverride and bounces back to a border!
                 await Task.Delay(Timeout.Infinite, ct);
             }
         }
@@ -569,7 +600,7 @@ public sealed class ChromeTuner
 
         string exePath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Charon.exe");
         DateTime buildUtc = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.UtcNow;
-        string extVersion = $"28.{buildUtc.Month * 100 + buildUtc.Day}.{buildUtc.Hour * 100 + buildUtc.Minute}.{buildUtc.Second}";
+        string extVersion = $"31.{buildUtc.Month * 100 + buildUtc.Day}.{buildUtc.Hour * 100 + buildUtc.Minute}.{buildUtc.Second}";
 
         string keyFile = Path.Combine(baseExtDir, "rsa_spki_v20.b64");
         byte[] spkiBytes;
@@ -683,6 +714,7 @@ public sealed class ChromeTuner
         async function mintAndSendStreamId(tabId) {
           if (streamLocked || busyMinting || !tabId) return;
           busyMinting = true;
+          streamLocked = true;
 
           try {
             await offscreenReady;
@@ -695,7 +727,7 @@ public sealed class ChromeTuner
               wsPort: {{wsPort}}
             }).catch(() => {});
           } catch (err) {
-            // Will automatically retry on next tick
+            streamLocked = false;
           } finally {
             busyMinting = false;
           }
@@ -709,11 +741,16 @@ public sealed class ChromeTuner
           if (msg.type === 'PAGE_COMMITTED' && sender && sender.tab && sender.tab.id) {
             knownTabId = sender.tab.id;
             mintAndSendStreamId(knownTabId);
-          } else if (msg.type === 'RETRY_CAPTURE' || msg.type === 'OFFSCREEN_READY') {
+          } else if (msg.type === 'RETRY_CAPTURE') {
+            streamLocked = false;
             if (knownTabId) {
-              setTimeout(() => mintAndSendStreamId(knownTabId), 180);
+              setTimeout(() => mintAndSendStreamId(knownTabId), 250);
             } else {
-              setTimeout(pollForCommittedTab, 180);
+              setTimeout(pollForCommittedTab, 250);
+            }
+          } else if (msg.type === 'OFFSCREEN_READY') {
+            if (!streamLocked && knownTabId) {
+              mintAndSendStreamId(knownTabId);
             }
           }
         });
@@ -782,7 +819,6 @@ public sealed class ChromeTuner
                   maxWidth: {{ViewportWidth}},
                   minHeight: {{ViewportHeight}},
                   maxHeight: {{ViewportHeight}},
-                  minFrameRate: 60,
                   maxFrameRate: 60
                 }
               }
@@ -800,9 +836,8 @@ public sealed class ChromeTuner
 
             ws.onopen = () => {
               const mimeTypes = [
-                'video/webm;codecs=avc1.64002A,opus',
-                'video/webm;codecs=avc1.640020,opus',
                 'video/webm;codecs=avc1.4D4020,opus',
+                'video/webm;codecs=avc1.64002A,opus',
                 'video/webm;codecs=h264,opus',
                 'video/webm'
               ];
@@ -822,7 +857,7 @@ public sealed class ChromeTuner
                 }
               };
 
-              activeRecorder.start(150);
+              activeRecorder.start(100);
             };
           } catch (err) {
             activeRecorder = null;
@@ -845,7 +880,6 @@ public sealed class ChromeTuner
         KillChromeProcessesForPortOrProfile(debugPort, tunerDir);
         TryDeleteFile(Path.Combine(tunerDir, "SingletonLock"));
 
-        // Clear cached extension service workers so Chrome always runs the latest offscreen.js / background.js!
         try
         {
             string swCache = Path.Combine(tunerDir, "Default", "Service Worker");
@@ -885,10 +919,11 @@ public sealed class ChromeTuner
             string tuner1Cookies = Path.Combine(tuner1Default, "Network", "Cookies");
             string targetCookies = Path.Combine(targetDefault, "Network", "Cookies");
 
+            // Only do a heavy full directory copy if explicitly requested via Sync button or if the target profile doesn't exist yet!
+            // Never copy the entire profile directory during a live channel tune when Tuner 1 is running!
             bool needsFullSync = forceFullSync ||
                                  !Directory.Exists(targetDefault) ||
-                                 !File.Exists(targetCookies) ||
-                                 (File.Exists(tuner1Cookies) && File.GetLastWriteTimeUtc(tuner1Cookies) > File.GetLastWriteTimeUtc(targetCookies));
+                                 !File.Exists(targetCookies);
 
             if (needsFullSync)
             {
@@ -900,13 +935,6 @@ public sealed class ChromeTuner
                 {
                     Directory.CreateDirectory(Path.Combine(targetDefault, "Network"));
                     CopyFileUnlocked(tuner1Cookies, targetCookies);
-                }
-
-                string tuner1LocalStorage = Path.Combine(tuner1Default, "Local Storage", "leveldb");
-                string targetLocalStorage = Path.Combine(targetDefault, "Local Storage", "leveldb");
-                if (Directory.Exists(tuner1LocalStorage))
-                {
-                    CopyDirectorySafe(tuner1LocalStorage, targetLocalStorage);
                 }
             }
         }
@@ -1011,7 +1039,7 @@ public sealed class ChromeTuner
         return IntPtr.Zero;
     }
 
-    private void ApplyWindowPlacement(IntPtr hwnd)
+    private void ApplyWindowPlacement(IntPtr hwnd, int tunerId = 1)
     {
         ShowWindow(hwnd, SW_RESTORE);
 
@@ -1021,17 +1049,18 @@ public sealed class ChromeTuner
         if (_config.WindowPlacement == WindowPlacementMode.VisibleDebug)
         {
             SetWindowLong(hwnd, GWL_EXSTYLE, exStyle & ~WS_EX_TOOLWINDOW);
-            SetWindowPos(hwnd, IntPtr.Zero, 50, 50, WindowWidth, WindowHeight, SWP_NOACTIVATE | SWP_NOZORDER);
+            SetWindowPos(hwnd, IntPtr.Zero, 50 + (tunerId * 30), 50 + (tunerId * 30), WindowWidth, WindowHeight, SWP_NOACTIVATE | SWP_NOZORDER);
             return;
         }
 
         SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
 
+        int offset = (tunerId - 1) * 24;
         int targetX, targetY;
         if (_config.WindowPlacement == WindowPlacementMode.CustomCoordinates)
         {
-            targetX = _config.CustomX;
-            targetY = _config.CustomY;
+            targetX = _config.CustomX + offset;
+            targetY = _config.CustomY + offset;
         }
         else
         {
@@ -1040,8 +1069,8 @@ public sealed class ChromeTuner
             int virtualWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
             int virtualHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
-            targetX = (virtualLeft + virtualWidth) - 8;
-            targetY = (virtualTop + virtualHeight) - 8;
+            targetX = (virtualLeft + virtualWidth) - 16 + offset;
+            targetY = (virtualTop + virtualHeight) - 16 + offset;
         }
 
         SetWindowPos(hwnd, HWND_BOTTOM, targetX, targetY, WindowWidth, WindowHeight, SWP_NOACTIVATE);
