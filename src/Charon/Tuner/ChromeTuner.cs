@@ -452,7 +452,7 @@ public sealed class ChromeTuner
                 if (!string.IsNullOrWhiteSpace(provider.StyleCss))
                 {
                     string escapedCss = JsonEncodedText.Encode(provider.StyleCss).ToString();
-                    cdpScriptBuilder.AppendLine($"(function(){{ if (location.pathname.startsWith('/live')) return; let s = document.getElementById('charon-css'); if (!s && (document.head || document.documentElement)) {{ s = document.createElement('style'); s.id = 'charon-css'; (document.head || document.documentElement).appendChild(s); }} if (s && s.textContent !== \"{escapedCss}\") s.textContent = \"{escapedCss}\"; }})();");
+                    cdpScriptBuilder.AppendLine($"(function(){{ let s = document.getElementById('charon-css'); if (!s && (document.head || document.documentElement)) {{ s = document.createElement('style'); s.id = 'charon-css'; (document.head || document.documentElement).appendChild(s); }} if (s && s.textContent !== \"{escapedCss}\") s.textContent = \"{escapedCss}\"; }})();");
                 }
                 if (!string.IsNullOrWhiteSpace(provider.TuneJs))
                 {
@@ -466,7 +466,7 @@ public sealed class ChromeTuner
                 }
 
                 int msgId = 10;
-                for (int i = 0; i < 12; i++)
+                for (int i = 0; i < 18; i++)
                 {
                     ct.ThrowIfCancellationRequested();
                     await Task.Delay(350, ct);
@@ -600,7 +600,7 @@ public sealed class ChromeTuner
 
         string exePath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Charon.exe");
         DateTime buildUtc = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.UtcNow;
-        string extVersion = $"31.{buildUtc.Month * 100 + buildUtc.Day}.{buildUtc.Hour * 100 + buildUtc.Minute}.{buildUtc.Second}";
+        string extVersion = $"32.{buildUtc.Month * 100 + buildUtc.Day}.{buildUtc.Hour * 100 + buildUtc.Minute}.{buildUtc.Second}";
 
         string keyFile = Path.Combine(baseExtDir, "rsa_spki_v20.b64");
         byte[] spkiBytes;
@@ -670,7 +670,7 @@ public sealed class ChromeTuner
         if (!string.IsNullOrWhiteSpace(provider.StyleCss))
         {
             string escapedCss = JsonEncodedText.Encode(provider.StyleCss).ToString();
-            mainWorldBuilder.AppendLine($"(function(){{ const inject = () => {{ if (location.pathname.startsWith('/live')) return; if (!document.getElementById('charon-css') && (document.head || document.documentElement)) {{ const s = document.createElement('style'); s.id = 'charon-css'; s.textContent = \"{escapedCss}\"; (document.head || document.documentElement).appendChild(s); }} }}; inject(); document.addEventListener('DOMContentLoaded', inject); }})();");
+            mainWorldBuilder.AppendLine($"(function(){{ const inject = () => {{ if (!document.getElementById('charon-css') && (document.head || document.documentElement)) {{ const s = document.createElement('style'); s.id = 'charon-css'; s.textContent = \"{escapedCss}\"; (document.head || document.documentElement).appendChild(s); }} }}; inject(); document.addEventListener('DOMContentLoaded', inject); }})();");
         }
         if (!string.IsNullOrWhiteSpace(provider.TuneJs))
         {
