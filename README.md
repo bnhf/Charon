@@ -11,7 +11,7 @@
 
 # Charon
 
-Charon is a high-performance C# browser-based tuner bridge designed to manage, tune, and stream live television from web-based media providers directly into **Channels DVR** or any client supporting M3U playlists and MPEG-TS streams.
+Charon is a C# browser-based tuner bridge designed to manage, tune, and stream live television from web-based media providers directly into any client supporting M3U playlists and MPEG-TS streams.
 
 ## Features
 
