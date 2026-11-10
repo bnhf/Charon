@@ -1,6 +1,6 @@
-<p align="center">
+<kbd>
   <img src="docs/assets/header.png" width="100%" alt="Charon Banner" />
-</p>
+</kbd>
 
 # Credits
 
