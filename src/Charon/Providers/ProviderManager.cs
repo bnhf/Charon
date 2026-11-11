@@ -644,15 +644,23 @@ public class ProviderManager
         return (provider, channel);
     }
 
-    public string GenerateM3uPlaylist(CharonConfig config)
+    /// <param name="providerFilter">
+    /// Optional set of provider IDs to include (case-insensitive). Null or empty includes all enabled providers.
+    /// </param>
+    public string GenerateM3uPlaylist(CharonConfig config, IReadOnlySet<string>? providerFilter = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine("#EXTM3U");
 
         string baseUrl = $"http://{config.ResolvedLanIp}:{config.ResolvedPort}";
 
+        bool filterActive = providerFilter is { Count: > 0 };
+
         foreach (var provider in _providers.Where(p => p.Manifest.Enabled))
         {
+            if (filterActive && !providerFilter!.Contains(provider.Manifest.Id))
+                continue;
+
             string group = string.IsNullOrWhiteSpace(provider.Manifest.GroupTitle)
                 ? provider.Manifest.Name
                 : provider.Manifest.GroupTitle;
