@@ -93,6 +93,7 @@ You can fine-tune your channel lineup using either the native desktop interface 
    - **Source Name:** `Charon`
    - **Stream Format:** `MPEG-TS`
    - **Source:** Select `URL` and enter: `http://<CHARON-IP>:48590/playlist.m3u`
+   - *Optional:* To include only specific providers, add a `provider` filter using the provider ID(s) from each provider's `provider.json`, comma separated — e.g. `http://<CHARON-IP>:48590/playlist.m3u?provider=xfinity` or `?provider=xfinity,youtubetv`. This lets you create a separate Channels DVR source per provider.
    - **XMLTV Guide Data:** Leave blank (Gracenote IDs in the M3U will map guide data automatically).
    - **Max Connections:** Match your configured Charon tuner limit (e.g., `1` to `4`).
 4. Click **Save**. Channels DVR will automatically index your lineup and download guide data.
