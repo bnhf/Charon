@@ -71,10 +71,17 @@ public sealed class CharonServer : IAsyncDisposable
         });
 
         // 2. Channels DVR M3U Playlist Endpoint
+        //    Optional filter: ?provider=xfinity or ?provider=xfinity,youtubetv
+        //    (repeated ?provider=a&provider=b also works). Matches provider IDs, case-insensitive.
         _app.MapGet("/playlist.m3u", (HttpContext ctx) =>
         {
             _providers.ReloadProviders();
-            string m3u = _providers.GenerateM3uPlaylist(_config);
+
+            var providerFilter = ctx.Request.Query["provider"]
+                .SelectMany(v => (v ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            string m3u = _providers.GenerateM3uPlaylist(_config, providerFilter);
             ctx.Response.ContentType = "audio/x-mpegurl; charset=utf-8";
             return ctx.Response.WriteAsync(m3u);
         });
