@@ -31,6 +31,16 @@ public class ChannelSyncService
                 $"No channels were found on {provider.Manifest.Name}. Please click '1. Login to Provider', sign in, CLOSE the Chrome login window completely, and then click '2. Scan & Sync Lineup'.");
         }
 
+        // Apply the user's current hide choices before matching, so hidden channels (e.g. Sling Freestream) skip the DVR lookup
+        var previousHidden = provider.Channels
+            .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().IsHidden, StringComparer.OrdinalIgnoreCase);
+        foreach (var ch in scrapedChannels)
+        {
+            if (previousHidden.TryGetValue(ch.Id, out bool hidden))
+                ch.IsHidden = hidden;
+        }
+
         // If the provider (like Spectrum) already supplies native Gracenote tmsid values, skip the Channels DVR lookup!
         int prePopulated = scrapedChannels.Count(c => !string.IsNullOrWhiteSpace(c.StationId));
         if (prePopulated == scrapedChannels.Count)
@@ -59,10 +69,13 @@ public class ChannelSyncService
         int cdpPort = FindFreeLoopbackPort(9330);
        bool isSpectrum = provider.Manifest.Id.Contains("spectrum", StringComparison.OrdinalIgnoreCase);
         bool isXfinity = provider.Manifest.Id.Contains("xfinity", StringComparison.OrdinalIgnoreCase);
+        bool isSling = provider.Manifest.Id.Contains("sling", StringComparison.OrdinalIgnoreCase);
         string targetUrl = isSpectrum
             ? "https://watch.spectrum.net/guide"
             : isXfinity
             ? "https://www.xfinity.com/stream/listings"
+            : isSling
+            ? "https://watch.sling.com/dashboard/grid_guide/grid_guide_a_z"
             : "https://tv.youtube.com/live";
 
         int posX = config.WindowPlacement == WindowPlacementMode.VisibleDebug ? 80 : -3200;
@@ -144,6 +157,38 @@ public class ChannelSyncService
                         if (parsed.Count > 0)
                             return parsed;
                     }
+                    await Task.Delay(1500);
+                }
+
+                return [];
+            }
+            else if (isSling)
+            {
+                // Sling: pass "Who's Watching?", open the A-Z guide, then read the full lineup from its virtualized list
+                string slingJs = GetSlingScraperJs();
+                var deadline = DateTime.UtcNow.AddSeconds(60);
+                int attempt = 0;
+
+                while (DateTime.UtcNow < deadline)
+                {
+                    attempt++;
+                    statusCallback($"Step 1/2: Waiting for Sling TV A-Z guide to load (attempt {attempt})...");
+                    string? res = await EvaluateJsStringAsync(ws, attempt, slingJs);
+
+                    if (!string.IsNullOrWhiteSpace(res))
+                    {
+                        if (res.StartsWith("{\"status\":", StringComparison.Ordinal))
+                        {
+                            log($"[Sync] {res}");
+                        }
+                        else if (res.StartsWith("[", StringComparison.Ordinal) && res != "[]")
+                        {
+                            var parsed = ProviderManager.ParseChannelsJson(res);
+                            if (parsed.Count > 0)
+                                return parsed;
+                        }
+                    }
+
                     await Task.Delay(1500);
                 }
 
@@ -613,7 +658,89 @@ public class ChannelSyncService
           return JSON.stringify(results);
         })()
         """;
-		
+
+    private static string GetSlingScraperJs() => """
+        (() => {
+          const path = location.pathname;
+          const status = (s, extra) => JSON.stringify(Object.assign({ status: s, url: location.href }, extra || {}));
+
+          // "Who's Watching?" appears on every fresh page load unless "Don't Ask Again" was chosen
+          if (path.startsWith('/switch_user_profile')) {
+            const avatar = document.querySelector('[data-testid^="SwitchUserProfilesIcons-0"] .Card-Avatar-Interaction-Container');
+            if (avatar) avatar.click();
+            return status(avatar ? 'selecting_profile' : 'waiting_for_profile_picker');
+          }
+
+          if (!path.startsWith('/dashboard/grid_guide')) {
+            if (path.startsWith('/dashboard')) {
+              history.pushState({}, '', '/dashboard/grid_guide/grid_guide_a_z');
+              dispatchEvent(new PopStateEvent('popstate'));
+              return status('opening_guide');
+            }
+            return status(location.hostname === 'watch.sling.com' ? 'waiting_for_sling' : 'not_logged_in');
+          }
+
+          // The guide is a react-window list; its itemData.getChannel(i) holds every row, not just the rendered ones
+          const cell = document.querySelector('img.grid-cell-image') || document.querySelector('[data-testid^="channel-"]');
+          const fiberKey = cell && Object.keys(cell).find((k) => k.startsWith('__reactFiber'));
+          let fiber = fiberKey ? cell[fiberKey] : null;
+          let list = null;
+          for (let i = 0; fiber && i < 40; i++, fiber = fiber.return) {
+            const p = fiber.memoizedProps;
+            if (p && p.itemData && typeof p.itemData.getChannel === 'function') { list = p; break; }
+          }
+          if (!list) return status('waiting_for_guide');
+
+          const total = Number(list.itemCount || 0);
+          const results = [];
+          const seen = new Set();
+          let missing = 0;
+
+          for (let i = 0; i < total; i++) {
+            let c = null;
+            try { c = list.itemData.getChannel(i); } catch (e) {}
+            if (!c || !c.id) { missing++; continue; }
+            if (c.format && c.format !== 'GRID_GUIDE_CHANNEL') continue;
+
+            const guid = String(c.id).toLowerCase();
+            if (!/^[0-9a-f]{32}$/.test(guid) || seen.has(guid)) continue;
+            seen.add(guid);
+
+            const adobe = (c.actions && c.actions.DETAIL_VIEW && c.actions.DETAIL_VIEW.adobe) || {};
+            const name = String(c.title || adobe.ChannelName || '').trim();
+            const callSign = String(adobe.CallSign || '').trim();
+            // e.g. "Starz:224" for a subscription, "Freestream:658" for Sling's free channels
+            const pkg = String(adobe.PackageName || '');
+            if (!name) continue;
+
+            results.push({
+              Id: `${(callSign || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${guid.slice(0, 8)}`,
+              Name: name,
+              ChannelNumber: '',
+              StationId: '',
+              Url: `https://watch.sling.com/1/channel/${guid}/watch`,
+              IsHidden: /^Freestream\b/i.test(pkg)
+            });
+          }
+
+          // Rows load a page at a time; scroll the list until they all have data (the last row is a placeholder)
+          if (missing > 1) {
+            let scroller = cell.parentElement;
+            while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 10 && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) {
+              scroller = scroller.parentElement;
+            }
+            const atBottom = !scroller || scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+            window.__charonSlingBottomHits = atBottom ? (window.__charonSlingBottomHits || 0) + 1 : 0;
+            if (window.__charonSlingBottomHits < 2) {
+              if (scroller) scroller.scrollTop += scroller.clientHeight * 5;
+              return status('loading_guide_rows', { loaded: results.length, total });
+            }
+          }
+
+          return JSON.stringify(results);
+        })()
+        """;
+
     // Direct, verified Gracenote TMS StationId table (East/Central/Mountain ID, Pacific ID)
     // Bypasses fuzzy text search completely for core national networks!
     private static readonly Dictionary<string, (string EastId, string WestId)> VerifiedGracenoteStationIds =
@@ -791,6 +918,26 @@ public class ChannelSyncService
         { "Golf Channel",               ("61854",  "61854") },
         { "Tennis Channel",             ("60316",  "60316") },
 
+        // Premium (Starz family, as titled in the Sling guide; East and West are separate channels there)
+        { "STARZ",                      ("34941",  "34941") },
+        { "Starz West",                 ("34949",  "34949") },
+        { "Starz Kids & Family",        ("57581",  "57581") },
+        { "Starz Comedy",               ("57569",  "57569") },
+        { "Starz Edge",                 ("57573",  "57573") },
+        { "Starz in Black",             ("67235",  "67235") },
+        { "Starz Cinema",               ("67236",  "67236") },
+        { "Starz Encore",               ("36225",  "36225") },
+        { "Starz Encore West",          ("17125",  "17125") },
+        { "Starz Encore Classic",       ("14764",  "14764") },
+        { "Starz Encore Westerns",      ("102906", "102906") },
+        { "Starz Encore Suspense",      ("14766",  "14766") },
+        { "Starz Encore Black",         ("14870",  "14870") },
+        { "Starz Encore Action",        ("72015",  "72015") },
+        { "Starz Encore Family",        ("102903", "102903") },
+        { "IndiePlex",                  ("65795",  "65795") },
+        { "RetroPlex",                  ("65791",  "65791") },
+        { "MoviePlex",                  ("83075",  "83075") },
+
         // Entertainment Studios & Shopping
         { "Comedy.TV",                  ("82470",  "82470") },
         { "JusticeCentral.TV",          ("78850",  "78850") },
@@ -817,6 +964,10 @@ public class ChannelSyncService
         // Eastern (UTC-5), Central (UTC-6), and Mountain (UTC-7) use East feeds on YTTV.
         bool preferPacific = TimeZoneInfo.Local.BaseUtcOffset.TotalHours <= -8.0;
 
+        int hiddenCount = channels.Count(c => c.IsHidden && string.IsNullOrWhiteSpace(c.StationId));
+        if (hiddenCount > 0)
+            log($"[Gracenote] Skipping {hiddenCount} hidden channels (unhide them and scan again to match their Gracenote IDs)");
+
         for (int i = 0; i < channels.Count; i++)
         {
             var ch = channels[i];
@@ -827,6 +978,9 @@ public class ChannelSyncService
                 updatedCount++;
                 continue;
             }
+
+            if (ch.IsHidden)
+                continue;
 
             string rawName = ch.Name.Trim();
             TmsStation? match = null;

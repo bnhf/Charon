@@ -1,0 +1,8 @@
+{
+  "id": "sling",
+  "name": "Sling TV",
+  "groupTitle": "Sling TV",
+  "enabled": true,
+  "loginUrl": "https://watch.sling.com",
+  "tuneScriptDelayMs": 2000
+}

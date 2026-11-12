@@ -1,0 +1,20 @@
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  cursor: none !important;
+}
+
+/* Sling's metadata/controls overlay, the Bitmovin UI layer, and toast notifications */
+[data-testid="player-controls-container"],
+.player-controls,
+.bmpui-ui-uicontainer,
+.bitmovinplayer-poster,
+.Toastify {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
