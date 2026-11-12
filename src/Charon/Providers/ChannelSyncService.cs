@@ -800,7 +800,26 @@ public class ChannelSyncService
         { "QVC",                        ("60222",  "60222") },
 		{ "AWE",                        ("59436",  "59436") },
         { "HBCU GO",                    ("125163", "125163") },
-        { "HSN",                        ("62077",  "62077") }
+        { "HSN",                        ("62077",  "62077") },
+
+        // Xfinity premium callSigns (matched against the stream URL; callSigns keep legacy names, e.g. HBO2H = HBO Hits)
+        { "HBOHD",                      ("19548",  "19548") },
+        { "HBO-W",                      ("10244",  "10244") },
+        { "HBO2H",                      ("59368",  "59368") },
+        { "HBOSG",                      ("10243",  "10243") },
+        { "HBOCM",                      ("18429",  "18429") },
+        { "HBOZN",                      ("18431",  "18431") },
+        { "SHOHD",                      ("21868",  "21868") },
+        { "SHO2e",                      ("11116",  "11116") },
+        { "SHOCe",                      ("16153",  "16153") },
+        { "SHOXe",                      ("18086",  "18086") },
+        { "SHOFe",                      ("25274",  "25274") },
+        { "TMCHD",                      ("35329",  "35329") },
+        { "TMCXe",                      ("60951",  "60951") },
+        { "MGM+",                       ("65687",  "65687") },
+        { "MGMHT",                      ("67929",  "67929") },
+        { "MGMMR",                      ("74073",  "74073") },
+        { "MGMDR",                      ("103828", "103828") }
     };
 
     private static async Task<int> MatchGracenoteStationsAsync(
@@ -831,8 +850,12 @@ public class ChannelSyncService
             string rawName = ch.Name.Trim();
             TmsStation? match = null;
 
-            // 1. Check Verified National Network Gracenote StationId table first!
-            if (VerifiedGracenoteStationIds.TryGetValue(rawName, out var verifiedIds))
+            var xfMatch = System.Text.RegularExpressions.Regex.Match(ch.Url ?? "", @"/stream/live/([^/]+)/\d+/");
+            string? urlCallSign = xfMatch.Success ? Uri.UnescapeDataString(xfMatch.Groups[1].Value) : null;
+
+            // 1. Check Verified National Network Gracenote StationId table first (by display name, then by Xfinity URL callSign)
+            if (VerifiedGracenoteStationIds.TryGetValue(rawName, out var verifiedIds) ||
+                (!string.IsNullOrWhiteSpace(urlCallSign) && VerifiedGracenoteStationIds.TryGetValue(urlCallSign, out verifiedIds)))
             {
                 ch.StationId = preferPacific ? verifiedIds.WestId : verifiedIds.EastId;
                 updatedCount++;
@@ -841,9 +864,6 @@ public class ChannelSyncService
             }
 
             // 2. Skip vague local affiliate names that lack real FCC call letters (e.g. "FOX 46", "CW Charlotte", "TV64", "PBS NC", "SCETV")
-            var xfMatch = System.Text.RegularExpressions.Regex.Match(ch.Url ?? "", @"/stream/live/([^/]+)/\d+/");
-            string? urlCallSign = xfMatch.Success ? Uri.UnescapeDataString(xfMatch.Groups[1].Value) : null;
-
             if (string.IsNullOrWhiteSpace(urlCallSign) && IsVagueLocalStationName(rawName))
             {
                 log($"[Gracenote] [--] {ch.Name}: Local station without FCC call letters (leaving blank for manual mapping in Channels DVR)");
