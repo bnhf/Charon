@@ -11,7 +11,7 @@
     <ApplicationTitle>Charon</ApplicationTitle>
     <AssemblyName>Charon</AssemblyName>
     <RootNamespace>Charon</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.0.2</Version>
 
     <SelfContained>true</SelfContained>
     <PublishSingleFile>false</PublishSingleFile>
@@ -21,6 +21,11 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
 	<Resource Include="Charon.ico" />
+  </ItemGroup>
+  
+  <ItemGroup>
+  <None Remove="**\*.bak" />
+  <Content Remove="**\*.bak" />
   </ItemGroup>
 
   <ItemGroup>
