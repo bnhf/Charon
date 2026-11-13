@@ -25,7 +25,7 @@ public class CharonConfig
     // Saved Channels DVR Server settings for Gracenote StationId resolution (blank on first run)
     public string ChannelsDvrIp { get; set; } = string.Empty;
     public int ChannelsDvrPort { get; set; } = 8089;
-    
+    public string LastSelectedProviderId { get; set; } = string.Empty;
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public WindowPlacementMode WindowPlacement { get; set; } = WindowPlacementMode.AutoOffScreen;
     public int CustomX { get; set; } = -3200;
