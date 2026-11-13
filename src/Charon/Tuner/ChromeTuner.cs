@@ -52,6 +52,7 @@ public sealed class ChromeTuner
             Arguments = string.Join(" ",
             [
                 $"--user-data-dir=\"{primaryTunerProfile}\"",
+				"--remote-debugging-port=48601",
                 "--no-first-run",
                 "--no-default-browser-check",
                 "--autoplay-policy=no-user-gesture-required",
@@ -385,7 +386,7 @@ public sealed class ChromeTuner
         try
         {
             string? browserWsUrl = null;
-            for (int attempt = 0; attempt < 120; attempt++)
+            for (int attempt = 0; attempt < 200; attempt++) // Up to 10 seconds for slower PCs
             {
                 ct.ThrowIfCancellationRequested();
                 try
@@ -399,14 +400,22 @@ public sealed class ChromeTuner
                     }
                 }
                 catch { }
-                await Task.Delay(15, ct);
+                await Task.Delay(50, ct);
             }
 
             if (!string.IsNullOrWhiteSpace(browserWsUrl))
             {
                 using var bws = new ClientWebSocket();
                 await bws.ConnectAsync(new Uri(browserWsUrl), ct);
-                await SendCdpCommandAndWaitAsync(bws, 1, "Extensions.loadUnpacked", new { path = extDir }, ct);
+                string? extResp = await SendCdpCommandAndWaitAsync(bws, 1, "Extensions.loadUnpacked", new { path = extDir }, ct);
+                if (extResp != null && extResp.Contains("\"error\"", StringComparison.OrdinalIgnoreCase))
+                {
+                    logCallback?.Invoke($"[Tuner {tunerId}] Extensions.loadUnpacked error: {extResp}");
+                }
+            }
+            else
+            {
+                logCallback?.Invoke($"[Tuner {tunerId}] ERROR: Timed out waiting for Chrome debug port {debugPort} (is another Chrome window open in Profile Tuner_{tunerId}?).");
             }
 
             string? pageWsUrl = null;
@@ -571,7 +580,7 @@ public sealed class ChromeTuner
         await ws.SendAsync(bytes, WebSocketMessageType.Text, true, ct);
     }
 
-    private static async Task SendCdpCommandAndWaitAsync(ClientWebSocket ws, int id, string method, object parameters, CancellationToken ct)
+    private static async Task<string?> SendCdpCommandAndWaitAsync(ClientWebSocket ws, int id, string method, object parameters, CancellationToken ct)
     {
         await SendCdpCommandAsync(ws, id, method, parameters, ct);
 
@@ -587,10 +596,11 @@ public sealed class ChromeTuner
                 if (res.MessageType == WebSocketMessageType.Close) break;
                 string json = Encoding.UTF8.GetString(buf, 0, res.Count);
                 if (json.Contains($"\"id\":{id}", StringComparison.Ordinal))
-                    break;
+                    return json;
             }
         }
         catch { }
+        return null;
     }
 
     private (string ExtDir, string ExtensionId, string ExtVersion) EnsureTabCaptureExtension(int tunerId, int wsPort, LoadedProvider provider)
@@ -600,7 +610,7 @@ public sealed class ChromeTuner
 
         string exePath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Charon.exe");
         DateTime buildUtc = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.UtcNow;
-        string extVersion = $"32.{buildUtc.Month * 100 + buildUtc.Day}.{buildUtc.Hour * 100 + buildUtc.Minute}.{buildUtc.Second}";
+        string extVersion = $"35.{buildUtc.Month * 100 + buildUtc.Day}.{buildUtc.Hour * 100 + buildUtc.Minute}.{buildUtc.Second}";
 
         string keyFile = Path.Combine(baseExtDir, "rsa_spki_v20.b64");
         byte[] spkiBytes;
