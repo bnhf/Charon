@@ -45,8 +45,8 @@
       }
     }
   } catch {}
-
-  // The watch page embeds a hidden same-origin iframe of itself with a second Bitmovin player a few seconds
+  
+    // The watch page embeds a hidden same-origin iframe of itself with a second Bitmovin player a few seconds
   // off from the visible one. Tab capture records every frame's audio, so that player would be heard as a
   // repeat of each moment (and its extra 1080p decode stalls the main player). Keep it muted and paused, and
   // run everything below only in the top frame.
