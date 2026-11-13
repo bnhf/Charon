@@ -1,5 +1,5 @@
 #define MyAppName "Charon"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.2"
 #define MyAppPublisher "Charon"
 #define MyAppExeName "Charon.exe"
 
@@ -32,10 +32,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "startup"; Description: "Start Charon automatically when Windows starts"; GroupDescription: "Server Options:"; Flags: unchecked
 
 [Files]
-; 1. Copy all published .NET 11 runtime files, Charon.exe, and ffmpeg.exe (exclude Profiles, config.json, and channels.json from unconditional overwrite)
-Source: "C:\Charon\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "Profiles\*,config.json,channels.json,LOCK*,Singleton*"
-
-
+; 1. Copy all published .NET runtime files, Charon.exe, and ffmpeg.exe (exclude Profiles, TabCaptureExt, user configs, locks, and .bak backups)
+Source: "C:\Charon\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "Profiles\*,TabCaptureExt\*,config.json,channels.json,LOCK*,Singleton*,*.bak"
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
