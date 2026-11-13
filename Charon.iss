@@ -1,5 +1,5 @@
 #define MyAppName "Charon"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "Charon"
 #define MyAppExeName "Charon.exe"
 
@@ -7,6 +7,10 @@
 AppId={{8F4E9A12-3C7D-4B5E-9A21-6E8F7C4D3B2A}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersion}.0
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription={#MyAppName} Streaming Server Installer
+VersionInfoProductName={#MyAppName}
 SetupIconFile=src\Charon\Charon.ico
 AppPublisher={#MyAppPublisher}
 ; Install directly to C:\Charon so config.json, Profiles\, and Providers\channels.json are freely writable
@@ -14,10 +18,10 @@ DefaultDirName=C:\{#MyAppName}
 DisableDirPage=no
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputDir=userdocs:..\Desktop
+OutputDir=Output
 OutputBaseFilename=Charon-Setup
-Compression=lzma2/fast
-SolidCompression=yes
+Compression=lzma2
+SolidCompression=no
 WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
