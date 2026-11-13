@@ -76,7 +76,6 @@ public sealed class CharonServer : IAsyncDisposable
         _app.MapGet("/playlist.m3u", (HttpContext ctx) =>
         {
             _providers.ReloadProviders();
-
             var providerFilter = ctx.Request.Query["provider"]
                 .SelectMany(v => (v ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -160,6 +159,9 @@ public sealed class CharonServer : IAsyncDisposable
 
             if (root.TryGetProperty("channelsDvrPort", out var dvrPortProp))
                 _config.ChannelsDvrPort = dvrPortProp.GetInt32();
+
+            if (root.TryGetProperty("lastSelectedProviderId", out var provProp))
+                _config.LastSelectedProviderId = provProp.GetString()?.Trim() ?? string.Empty;
 
             _config.Save();
             TunersChanged?.Invoke();
@@ -294,6 +296,7 @@ public sealed class CharonServer : IAsyncDisposable
         customY = _config.CustomY,
         channelsDvrIp = _config.ChannelsDvrIp,
         channelsDvrPort = _config.ChannelsDvrPort,
+        lastSelectedProviderId = _config.LastSelectedProviderId,
         activeTuners = _activeTuners.ToDictionary(k => k.Key, v => v.Value)
     };
 
@@ -392,7 +395,7 @@ public sealed class CharonServer : IAsyncDisposable
   <!-- Provider Controls -->
   <div class="card row">
     <div class="row">
-      <select id="cmbProviders" style="min-width: 210px;" onchange="onProviderChange()"></select>
+      <select id="cmbProviders" style="min-width: 210px;" onchange="onProviderChange(true)"></select>
       <button class="btn btn-green" onclick="triggerLogin()">1. Login on Host</button>
       <button id="btnScan" class="btn" onclick="triggerScan()">2. Scan &amp; Sync Lineup</button>
       <button class="btn btn-gray" onclick="syncAuth()">Sync Tuners 2–4</button>
@@ -439,17 +442,17 @@ public sealed class CharonServer : IAsyncDisposable
   <!-- Workspace Tabs -->
   <div class="card">
     <div class="tabs">
-      <button id="tabBtnLogs" class="tab" onclick="showTab('logs')">Live Server Logs</button>
-      <button id="tabBtnEditor" class="tab active" onclick="showTab('editor')">Channel Lineup Editor (channels.json)</button>
+      <button id="tabBtnLogs" class="tab active" onclick="showTab('logs')">Live Server Logs</button>
+      <button id="tabBtnEditor" class="tab" onclick="showTab('editor')">Channel Lineup Editor (channels.json)</button>
     </div>
 
     <!-- Logs View -->
-    <div id="viewLogs" style="display:none;">
+    <div id="viewLogs">
       <div id="logBox">Loading server logs...</div>
     </div>
 
     <!-- Editor View -->
-    <div id="viewEditor">
+    <div id="viewEditor" style="display:none;">
       <div class="row" style="margin-bottom: 10px;">
         <div class="row">
           <button class="btn btn-gray" onclick="addChannel()">+ Add</button>
@@ -488,6 +491,7 @@ public sealed class CharonServer : IAsyncDisposable
 <script>
 let providers = [];
 let channels = [];
+let savedProviderId = localStorage.getItem('charon_selected_provider') || '';
 
 async function init() {
   await loadStatus();
@@ -509,6 +513,10 @@ async function loadStatus() {
     if (document.activeElement.id !== 'txtY') document.getElementById('txtY').value = d.customY;
     if (document.activeElement.id !== 'txtDvrIp') document.getElementById('txtDvrIp').value = d.channelsDvrIp || '';
     if (document.activeElement.id !== 'txtDvrPort') document.getElementById('txtDvrPort').value = d.channelsDvrPort || 8089;
+    if (d.lastSelectedProviderId) {
+      savedProviderId = d.lastSelectedProviderId;
+      localStorage.setItem('charon_selected_provider', savedProviderId);
+    }
 
     const activeCount = Object.keys(d.activeTuners || {}).length;
     document.getElementById('txtTunerStatus').textContent = `Active Tuners: ${activeCount} / ${d.maxTuners}`;
@@ -517,16 +525,22 @@ async function loadStatus() {
 
 async function loadProviders() {
   const sel = document.getElementById('cmbProviders');
-  const prev = sel.value;
+  const prev = sel.value || savedProviderId;
   const r = await fetch('/api/providers');
   providers = await r.json();
   sel.innerHTML = providers.map(p => `<option value="${p.id}">${p.name} (${p.activeChannels}/${p.totalChannels} ch)</option>`).join('');
   if (prev && providers.some(p => p.id === prev)) sel.value = prev;
-  onProviderChange();
+  onProviderChange(false);
 }
 
-function onProviderChange() {
-  const p = providers.find(x => x.id === document.getElementById('cmbProviders').value);
+function onProviderChange(userInitiated = false) {
+  const selectedId = document.getElementById('cmbProviders').value;
+  if (selectedId) {
+    savedProviderId = selectedId;
+    localStorage.setItem('charon_selected_provider', selectedId);
+    if (userInitiated) saveSettings();
+  }
+  const p = providers.find(x => x.id === selectedId);
   channels = p ? JSON.parse(JSON.stringify(p.channels)) : [];
   document.getElementById('rawJsonBox').value = JSON.stringify(channels, null, 2);
   renderTable();
@@ -640,7 +654,8 @@ async function saveSettings() {
       customX: parseInt(document.getElementById('txtX').value) || -3200,
       customY: parseInt(document.getElementById('txtY').value) || 0,
       channelsDvrIp: document.getElementById('txtDvrIp').value,
-      channelsDvrPort: parseInt(document.getElementById('txtDvrPort').value) || 8089
+      channelsDvrPort: parseInt(document.getElementById('txtDvrPort').value) || 8089,
+      lastSelectedProviderId: document.getElementById('cmbProviders').value
     })
   });
 }
