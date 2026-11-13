@@ -124,7 +124,14 @@ _server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
 
     private void RefreshProviderDropdown()
     {
-        int previousIndex = Math.Max(0, CmbProviders.SelectedIndex);
+        string? targetProviderId = _config.LastSelectedProviderId;
+        if (string.IsNullOrWhiteSpace(targetProviderId) &&
+            CmbProviders.SelectedIndex >= 0 &&
+            CmbProviders.SelectedIndex < _providers.Providers.Count)
+        {
+            targetProviderId = _providers.Providers[CmbProviders.SelectedIndex].Manifest.Id;
+        }
+
         _providers.ReloadProviders();
 
         CmbProviders.ItemsSource = _providers.Providers
@@ -133,7 +140,14 @@ _server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
 
         if (CmbProviders.Items.Count > 0)
         {
-            CmbProviders.SelectedIndex = Math.Min(previousIndex, CmbProviders.Items.Count - 1);
+            int matchIndex = -1;
+            if (!string.IsNullOrWhiteSpace(targetProviderId))
+            {
+                matchIndex = _providers.Providers.ToList().FindIndex(p =>
+                    string.Equals(p.Manifest.Id, targetProviderId, StringComparison.OrdinalIgnoreCase));
+            }
+
+            CmbProviders.SelectedIndex = matchIndex >= 0 ? matchIndex : 0;
             LoadSelectedProviderChannelsIntoEditor();
         }
 
@@ -143,6 +157,15 @@ _server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
     private void CmbProviders_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_isInitializing) return;
+
+        var selected = GetSelectedProvider();
+        if (selected is not null &&
+            !string.Equals(_config.LastSelectedProviderId, selected.Manifest.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            _config.LastSelectedProviderId = selected.Manifest.Id;
+            _config.Save();
+        }
+
         LoadSelectedProviderChannelsIntoEditor();
     }
 
