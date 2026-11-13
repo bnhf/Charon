@@ -645,7 +645,7 @@ public class ProviderManager
                     }
                     return;
                   }
-
+					
                   // Sling redirects every fresh page load to "Who's Watching?" (/switch_user_profile) unless
                   // "Don't Ask Again" was chosen. Remember the channel deep link before that redirect replaces it.
                   const watchPathRe = /^\/\d+\/channel\/[0-9a-f]{32}\/watch/i;
