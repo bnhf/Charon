@@ -5,7 +5,7 @@
 # Credits
 
 - **Spectrum Provider:** Built off of `spectrum.py` from the great work of **Kineticman** ([FastChannels](https://github.com/kineticman/FastChannels)).
-- **Xfinity Provider:** Developed by **bnhf** ([https://github.com/bnhf](https://github.com/bnhf)).
+- **Xfinity and Sling Providers:** Developed by **bnhf** ([https://github.com/bnhf](https://github.com/bnhf)).
 
 ---
 
