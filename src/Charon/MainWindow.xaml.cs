@@ -177,6 +177,7 @@ _server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
         if (provider is null)
         {
             TxtRawChannelsJson.Text = "[]";
+            BtnScanLineup.IsEnabled = false;
             UpdateLineupStats();
             return;
         }
@@ -196,6 +197,7 @@ _server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
 
         UpdateLineupStats();
         TxtRawChannelsJson.Text = ProviderManager.FormatChannelsJson(_editableChannels);
+        BtnScanLineup.IsEnabled = ProviderManager.CanScanLineup(provider.Manifest.Id);
     }
 
     private void ChkRawJsonMode_Changed(object sender, RoutedEventArgs e)
@@ -667,6 +669,28 @@ _server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
             MessageBox.Show("Please select a provider first.", "No Provider", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+		
+		if (!ProviderManager.CanScanLineup(provider.Manifest.Id))
+        {
+            MessageBox.Show(
+                $"{provider.Manifest.Name} uses a pre-configured channel lineup and does not use automated lineup scanning.\n\n" +
+                "Simply uncheck 'Hide' on the channels you want in the Lineup Editor and click Save Lineup.",
+                "Lineup Scan Not Needed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+		
+		if (!ChannelSyncService.CanScanProvider(provider.Manifest.Id))
+        {
+            MessageBox.Show(
+                $"{provider.Manifest.Name} already has its channels and Gracenote Station IDs pre-configured.\n\n" +
+                "No lineup scan is needed—simply uncheck 'Hide' on the channels you want in the Lineup Editor and click Save Lineup.",
+                "Lineup Scan Not Needed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
 
         bool isSpectrum = provider.Manifest.Id.Contains("spectrum", StringComparison.OrdinalIgnoreCase);
 
@@ -756,7 +780,8 @@ _server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
     {
         BusyBanner.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
         TxtBusyStatus.Text = statusText;
-        BtnScanLineup.IsEnabled = !isBusy;
+        var provider = GetSelectedProvider();
+        BtnScanLineup.IsEnabled = !isBusy && ProviderManager.CanScanLineup(provider?.Manifest.Id);
         BtnLoginProvider.IsEnabled = !isBusy;
         BtnReloadProviders.IsEnabled = !isBusy;
         CmbProviders.IsEnabled = !isBusy;
