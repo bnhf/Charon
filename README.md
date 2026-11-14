@@ -16,7 +16,7 @@ Charon is a C# browser-based tuner bridge designed to manage, tune, and stream l
 ## Features
 
 - **Multi-Tuner Virtual Tuner Pool:** Supports up to 4 simultaneous concurrent virtual browser tuners with off-screen window placement and GPU/DWM window-staggering to prevent compositor occlusion and resource contention.
-- **Out-of-the-Box Provider Modules:** Pre-configured support for **YouTube TV**, **Spectrum TV**, **Xfinity**, and **Sling TV**, complete with custom CSS styling, automated unmuting, full-bleed viewport locks, and channel tuning scripts.
+- **Out-of-the-Box Provider Modules:** Pre-configured support for **YouTube TV**, **Spectrum TV**, **Xfinity**, **Sling TV**, and **Philo**, complete with custom CSS styling, automated unmuting, full-bleed viewport locks, and channel tuning scripts.
 - **Embedded Web Management Dashboard:** Complete remote control accessible from any browser at `http://<IP>:48590`—allowing lineup editing, setting adjustments, log monitoring, and lineup scans without accessing the host machine directly.
 - **Interactive Channel Lineup Editor:** Built-in DataGrid and Raw JSON editor for `channels.json` with inline channel searching, bulk hide/show toggles, channel renumbering, and custom Gracenote station ID mapping.
 - **Automated Guide Matching (Gracenote / TMS):** Automated scraping and integration with your local Channels DVR server to automatically match web channels to Gracenote Station IDs.
@@ -37,7 +37,7 @@ Charon is a C# browser-based tuner bridge designed to manage, tune, and stream l
 
 ### Step 2: Choosing Your Provider
 
-Charon supports four major streaming providers out of the box:
+Charon supports five major streaming providers out of the box:
 
 1. Launch **Charon** (or navigate to `http://<HOST-IP>:48590` on any device on your LAN).
 2. Look at the provider selection dropdown near the top of the interface.
@@ -46,6 +46,7 @@ Charon supports four major streaming providers out of the box:
    - **Spectrum TV**
    - **Xfinity**
    - **Sling TV**
+   - **Philo**
 
 ---
 
@@ -56,7 +57,7 @@ Before tuning or scanning channels, Charon needs an active session:
 1. Select your target provider from the dropdown menu.
 2. Set the login target to **"Tuner 1 (Sync All)"** (or use the web dashboard's login trigger).
 3. Click **"1. Login to Provider"**.
-4. A visible Chrome window will open to the provider's sign-in page (`tv.youtube.com`, `watch.spectrum.net`, `xfinity.com/stream`, or `watch.sling.com`).
+4. A visible Chrome window will open to the provider's sign-in page (`tv.youtube.com`, `watch.spectrum.net`, `xfinity.com/stream`, `watch.sling.com`, or `philo.com`).
 5. Sign in to your account and verify that live video plays cleanly and without prompts.
    - **Sling TV:** When the **Who's Watching?** screen appears, click **Don't Ask Again** so tuners go straight to the channel. (If it still appears, Charon selects the first profile automatically.)
 6. **Close that Chrome login window completely.** Charon will automatically replicate your session cookies and authentication state across Tuners 2, 3, and 4.
@@ -71,7 +72,8 @@ Once authenticated, pull your live channel lineup directly into Charon:
 2. **Behavior by Provider:**
    - **Spectrum TV:** Charon scans your entitled channel lineup directly. Spectrum provides native Gracenote Station IDs (`tmsid`) in its lineup API, so it saves the lineup immediately without external prompts.
    - **Sling TV:** Charon reads every channel in your Sling A-Z guide. Channels from your subscriptions are visible, and Sling's free **Freestream** channels are added **hidden**. Unhide any you want and scan again to match their Gracenote IDs; hidden channels are skipped during Gracenote matching.
-   - **YouTube TV, Xfinity & Sling TV:** Charon will prompt for your **Channels DVR Server IP and Port** (default: `8089`). It scrapes your live provider guide grid via the Chrome DevTools Protocol and automatically queries your Channels DVR server to match and populate Gracenote `StationId` values for your local market.
+   - **Philo:** Charon reads Philo's full channel guide. Channels in your Philo subscription are visible, and Philo's **Free channels** are added **hidden**. Unhide any you want and scan again to match their Gracenote IDs. Tuning a Philo channel jumps straight to the live broadcast (Philo otherwise starts the current show from the beginning).
+   - **YouTube TV, Xfinity, Sling TV & Philo:** Charon will prompt for your **Channels DVR Server IP and Port** (default: `8089`). It scrapes your live provider guide grid via the Chrome DevTools Protocol and automatically queries your Channels DVR server to match and populate Gracenote `StationId` values for your local market.
 3. When complete, a summary dialog will display the total scraped channels and successfully mapped Gracenote IDs.
 
 ---

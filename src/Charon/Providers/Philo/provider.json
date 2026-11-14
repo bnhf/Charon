@@ -1,0 +1,8 @@
+{
+  "id": "philo",
+  "name": "Philo",
+  "groupTitle": "Philo",
+  "enabled": true,
+  "loginUrl": "https://www.philo.com/player",
+  "tuneScriptDelayMs": 2000
+}

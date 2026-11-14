@@ -1,0 +1,29 @@
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  cursor: none !important;
+}
+
+/* Philo's player overlays: title/metadata, playback controls, and the ads overlay.
+   Hidden with CSS only, so tune.js can still reach the JUMP TO LIVE button. */
+[class*="overlaysContainer"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* The video's container is centered with a translate(-50%, -50%) transform, which would make the
+   video's position: fixed relative to it; pin the container to the viewport instead. */
+[class*="videoElementContainer"] {
+  position: fixed !important;
+  transform: none !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+}

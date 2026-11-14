@@ -70,12 +70,16 @@ public class ChannelSyncService
        bool isSpectrum = provider.Manifest.Id.Contains("spectrum", StringComparison.OrdinalIgnoreCase);
         bool isXfinity = provider.Manifest.Id.Contains("xfinity", StringComparison.OrdinalIgnoreCase);
         bool isSling = provider.Manifest.Id.Contains("sling", StringComparison.OrdinalIgnoreCase);
+        bool isPhilo = provider.Manifest.Id.Contains("philo", StringComparison.OrdinalIgnoreCase);
         string targetUrl = isSpectrum
             ? "https://watch.spectrum.net/guide"
             : isXfinity
             ? "https://www.xfinity.com/stream/listings"
             : isSling
             ? "https://watch.sling.com/dashboard/grid_guide/grid_guide_a_z"
+            : isPhilo
+            // Start on Home, not the guide: the scraper must hook fetch before the guide's first request
+            ? "https://www.philo.com/player/mytv"
             : "https://tv.youtube.com/live";
 
         int posX = config.WindowPlacement == WindowPlacementMode.VisibleDebug ? 80 : -3200;
@@ -174,6 +178,38 @@ public class ChannelSyncService
                     attempt++;
                     statusCallback($"Step 1/2: Waiting for Sling TV A-Z guide to load (attempt {attempt})...");
                     string? res = await EvaluateJsStringAsync(ws, attempt, slingJs);
+
+                    if (!string.IsNullOrWhiteSpace(res))
+                    {
+                        if (res.StartsWith("{\"status\":", StringComparison.Ordinal))
+                        {
+                            log($"[Sync] {res}");
+                        }
+                        else if (res.StartsWith("[", StringComparison.Ordinal) && res != "[]")
+                        {
+                            var parsed = ProviderManager.ParseChannelsJson(res);
+                            if (parsed.Count > 0)
+                                return parsed;
+                        }
+                    }
+
+                    await Task.Delay(1500);
+                }
+
+                return [];
+            }
+            else if (isPhilo)
+            {
+                // Philo: capture the guide's own GraphQL request, then replay it to read the full lineup
+                string philoJs = GetPhiloScraperJs();
+                var deadline = DateTime.UtcNow.AddSeconds(45);
+                int attempt = 0;
+
+                while (DateTime.UtcNow < deadline)
+                {
+                    attempt++;
+                    statusCallback($"Step 1/2: Waiting for Philo guide to load (attempt {attempt})...");
+                    string? res = await EvaluateJsStringAsync(ws, attempt, philoJs);
 
                     if (!string.IsNullOrWhiteSpace(res))
                     {
@@ -741,6 +777,110 @@ public class ChannelSyncService
         })()
         """;
 
+    private static string GetPhiloScraperJs() => """
+        (async () => {
+          const status = (s, extra) => JSON.stringify(Object.assign({ status: s, url: location.origin + location.pathname }, extra || {}));
+          const onPhilo = /(^|\.)philo\.com$/i.test(location.hostname);
+
+          if (!onPhilo || !location.pathname.startsWith('/player')) {
+            return status(onPhilo ? 'not_logged_in' : 'waiting_for_philo');
+          }
+
+          // The guide is a GraphQL "page" query sent as a persisted query whose hash changes with Philo's releases.
+          // Capture the app's own request instead of hard-coding it, then replay it with large page sizes.
+          if (!window.__charonPhiloFetchHooked) {
+            window.__charonPhiloFetchHooked = true;
+            const origFetch = window.fetch;
+            window.__charonPhiloOrigFetch = origFetch;
+            window.fetch = function (input, init) {
+              try {
+                const url = typeof input === 'string' ? input : (input && input.url) || '';
+                const body = init && init.body;
+                if (/\/graphql/i.test(url) && typeof body === 'string' && body.includes('GUIDE')) {
+                  const ops = JSON.parse(body);
+                  const op = (Array.isArray(ops) ? ops : [ops])
+                    .find((o) => o && o.operationName === 'page' && o.variables && o.variables.pageType === 'GUIDE');
+                  if (op) window.__charonPhiloGuideOp = op;
+                }
+              } catch (e) {}
+              return origFetch.apply(this, arguments);
+            };
+          }
+
+          const op = window.__charonPhiloGuideOp;
+          if (!op) {
+            // The app caches the guide in memory, so if it loaded before the hook existed, reload Home and open it from there
+            if (location.pathname.startsWith('/player/guide')) {
+              location.href = '/player/mytv';
+              return status('reloading_home');
+            }
+            const link = document.querySelector('a[href="/player/guide"]');
+            if (link) link.click();
+            return status(link ? 'opening_guide' : 'waiting_for_philo_app');
+          }
+
+          const doFetch = window.__charonPhiloOrigFetch || window.fetch;
+          const results = [];
+          const seen = new Set();
+          let cursor = null;
+
+          // The server returns at most 200 rows per request
+          for (let page = 0; page < 20; page++) {
+            const body = [{
+              ...op,
+              variables: { ...op.variables, firstGroups: 200, initialTiles: 1, numSparseGroups: 0, startCursor: null, endCursor: cursor }
+            }];
+            const res = await doFetch('/graphql', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+            if (!res.ok) return status('guide_request_failed', { http: res.status });
+
+            const json = await res.json();
+            const reply = Array.isArray(json) ? json[0] : json;
+            const groups = reply && reply.data && reply.data.page && reply.data.page.groups;
+            if (!groups || !Array.isArray(groups.edges)) {
+              window.__charonPhiloGuideOp = null;
+              return status('guide_query_error', { errors: JSON.stringify((reply && reply.errors) || null).slice(0, 300) });
+            }
+
+            for (const edge of groups.edges) {
+              const node = edge && edge.node;
+              const ch = node && node.channel;
+              if (!ch || !ch.channelId || seen.has(ch.channelId)) continue;
+              seen.add(ch.channelId);
+
+              const name = String(ch.displayName || '').trim();
+              if (!name) continue;
+
+              // channelId is base64 of "Channel:<number>"
+              let numericId = '';
+              try { numericId = (atob(ch.channelId.replace(/-/g, '+').replace(/_/g, '/')).match(/(\d+)\s*$/) || [])[1] || ''; } catch (e) {}
+              const suffix = (numericId || ch.channelId.replace(/[^A-Za-z0-9]/g, '')).slice(-8).toLowerCase();
+              const section = String((node.header && node.header.title) || '');
+
+              results.push({
+                Id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${suffix}`,
+                Name: name,
+                ChannelNumber: '',
+                StationId: '',
+                // Philo redirects a channel link to whatever is airing on it now
+                Url: `https://www.philo.com/player/player/channel/${ch.channelId}`,
+                // The guide lists the subscription lineup under "All channels", then Philo's free channels under "Free channels"
+                IsHidden: /\bfree\b/i.test(section)
+              });
+            }
+
+            if (!groups.pageInfo || !groups.pageInfo.hasNextPage || !groups.pageInfo.endCursor) break;
+            cursor = groups.pageInfo.endCursor;
+          }
+
+          return JSON.stringify(results);
+        })()
+        """;
+
     // Direct, verified Gracenote TMS StationId table (East/Central/Mountain ID, Pacific ID)
     // Bypasses fuzzy text search completely for core national networks!
     private static readonly Dictionary<string, (string EastId, string WestId)> VerifiedGracenoteStationIds =
@@ -786,6 +926,7 @@ public class ChannelSyncService
         { "IFC",                        ("59444",  "59444") },
         { "Independent Film Channel",   ("59444",  "59444") },
         { "SundanceTV",                 ("71280",  "71280") },
+        { "Sundance TV",                ("71280",  "71280") },
         { "WE tv",                      ("59296",  "59296") },
         { "A&E",                        ("51529",  "73992") },
         { "Arts and Entertainment",     ("51529",  "73992") },
@@ -815,6 +956,7 @@ public class ChannelSyncService
         { "CMT",                        ("59440",  "59440") },
         { "Logo",                       ("46762",  "46762") },
         { "Pop",                        ("68796",  "68796") },
+        { "Pop TV",                     ("68796",  "68796") },
         { "Hallmark Channel",           ("66268",  "66268") },
         { "Hallmark Mystery",           ("61522",  "61522") },
         { "Hallmark Family",            ("105723", "105723") },
@@ -837,6 +979,7 @@ public class ChannelSyncService
         { "ION Media Networks",         ("62746",  "62746") },
         { "Reelz",                      ("119136", "119136") },
         { "UP (Uplifting Entertainment)",("66143", "66143") },
+        { "UPtv",                       ("66143",  "66143") },
 
         // Discovery / Nat Geo / Lifestyle
         { "Discovery Channel",          ("56905",  "56906") },
