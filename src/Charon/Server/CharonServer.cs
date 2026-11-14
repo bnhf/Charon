@@ -98,6 +98,7 @@ public sealed class CharonServer : IAsyncDisposable
                 id = p.Manifest.Id,
                 name = p.Manifest.Name,
                 loginUrl = p.Manifest.LoginUrl,
+                canScan = ProviderManager.CanScanLineup(p.Manifest.Id),
                 totalChannels = p.Channels.Count,
                 activeChannels = p.Channels.Count(c => !c.IsHidden),
                 channels = p.Channels
@@ -197,6 +198,9 @@ public sealed class CharonServer : IAsyncDisposable
 
             if (provider is null)
                 return Results.NotFound(new { error = "Provider not found." });
+
+            if (!ProviderManager.CanScanLineup(provider.Manifest.Id))
+                return Results.BadRequest(new { error = $"{provider.Manifest.Name} uses a pre-configured lineup and does not support scanning." });
 
             try
             {
@@ -543,6 +547,14 @@ function onProviderChange(userInitiated = false) {
   const p = providers.find(x => x.id === selectedId);
   channels = p ? JSON.parse(JSON.stringify(p.channels)) : [];
   document.getElementById('rawJsonBox').value = JSON.stringify(channels, null, 2);
+
+  const btnScan = document.getElementById('btnScan');
+  if (btnScan) {
+    const scannable = p ? Boolean(p.canScan) : false;
+    btnScan.disabled = !scannable;
+    btnScan.textContent = scannable ? '2. Scan & Sync Lineup' : '2. Pre-Mapped (No Scan Needed)';
+  }
+
   renderTable();
 }
 
