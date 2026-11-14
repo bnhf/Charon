@@ -13,6 +13,14 @@ public class ChannelSyncService
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(8) };
 
+    public static bool CanScanProvider(string? providerId) =>
+        !string.IsNullOrWhiteSpace(providerId) &&
+        (providerId.Contains("youtubetv", StringComparison.OrdinalIgnoreCase) ||
+         providerId.Contains("spectrum", StringComparison.OrdinalIgnoreCase) ||
+         providerId.Contains("xfinity", StringComparison.OrdinalIgnoreCase) ||
+		 providerId.Contains("philo", StringComparison.OrdinalIgnoreCase) ||
+         providerId.Contains("sling", StringComparison.OrdinalIgnoreCase));
+
     public static async Task<(List<ProviderChannel> Channels, int MatchedCount)> ScanAndMatchAsync(
         CharonConfig config,
         LoadedProvider provider,
@@ -21,6 +29,13 @@ public class ChannelSyncService
         Action<string> log,
         Action<string> statusCallback)
     {
+        if (!CanScanProvider(provider.Manifest.Id))
+        {
+            throw new InvalidOperationException(
+                $"{provider.Manifest.Name} uses a pre-configured channel lineup with Gracenote IDs already mapped and does not require scanning. " +
+                "Simply unhide the channels you want in the Channel Lineup Editor and click Save Lineup.");
+        }
+
         statusCallback($"Step 1/2: Scraping live channel lineup from {provider.Manifest.Name}...");
         log($"[Sync] Launching browser scan for {provider.Manifest.Name} using authenticated Tuner profile...");
 
@@ -30,8 +45,8 @@ public class ChannelSyncService
             throw new InvalidOperationException(
                 $"No channels were found on {provider.Manifest.Name}. Please click '1. Login to Provider', sign in, CLOSE the Chrome login window completely, and then click '2. Scan & Sync Lineup'.");
         }
-
-        // Apply the user's current hide choices before matching, so hidden channels (e.g. Sling Freestream) skip the DVR lookup
+		
+		// Apply the user's current hide choices before matching, so hidden channels (e.g. Sling Freestream) skip the DVR lookup
         var previousHidden = provider.Channels
             .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().IsHidden, StringComparer.OrdinalIgnoreCase);
@@ -67,17 +82,17 @@ public class ChannelSyncService
         log($"[Sync] Using authenticated Chrome profile: {selectedProfile}");
 
         int cdpPort = FindFreeLoopbackPort(9330);
-       bool isSpectrum = provider.Manifest.Id.Contains("spectrum", StringComparison.OrdinalIgnoreCase);
+        bool isSpectrum = provider.Manifest.Id.Contains("spectrum", StringComparison.OrdinalIgnoreCase);
         bool isXfinity = provider.Manifest.Id.Contains("xfinity", StringComparison.OrdinalIgnoreCase);
         bool isSling = provider.Manifest.Id.Contains("sling", StringComparison.OrdinalIgnoreCase);
-        bool isPhilo = provider.Manifest.Id.Contains("philo", StringComparison.OrdinalIgnoreCase);
-        string targetUrl = isSpectrum
+		bool isPhilo = provider.Manifest.Id.Contains("philo", StringComparison.OrdinalIgnoreCase);
+		string targetUrl = isSpectrum
             ? "https://watch.spectrum.net/guide"
             : isXfinity
             ? "https://www.xfinity.com/stream/listings"
-            : isSling
+			: isSling
             ? "https://watch.sling.com/dashboard/grid_guide/grid_guide_a_z"
-            : isPhilo
+			: isPhilo
             // Start on Home, not the guide: the scraper must hook fetch before the guide's first request
             ? "https://www.philo.com/player/mytv"
             : "https://tv.youtube.com/live";
@@ -166,7 +181,7 @@ public class ChannelSyncService
 
                 return [];
             }
-            else if (isSling)
+			 else if (isSling)
             {
                 // Sling: pass "Who's Watching?", open the A-Z guide, then read the full lineup from its virtualized list
                 string slingJs = GetSlingScraperJs();
@@ -198,7 +213,7 @@ public class ChannelSyncService
 
                 return [];
             }
-            else if (isPhilo)
+			else if (isPhilo)
             {
                 // Philo: capture the guide's own GraphQL request, then replay it to read the full lineup
                 string philoJs = GetPhiloScraperJs();
@@ -694,8 +709,8 @@ public class ChannelSyncService
           return JSON.stringify(results);
         })()
         """;
-
-    private static string GetSlingScraperJs() => """
+		
+	private static string GetSlingScraperJs() => """
         (() => {
           const path = location.pathname;
           const status = (s, extra) => JSON.stringify(Object.assign({ status: s, url: location.href }, extra || {}));
@@ -775,9 +790,9 @@ public class ChannelSyncService
 
           return JSON.stringify(results);
         })()
-        """;
-
-    private static string GetPhiloScraperJs() => """
+        """;	
+		
+		private static string GetPhiloScraperJs() => """
         (async () => {
           const status = (s, extra) => JSON.stringify(Object.assign({ status: s, url: location.origin + location.pathname }, extra || {}));
           const onPhilo = /(^|\.)philo\.com$/i.test(location.hostname);
@@ -880,7 +895,7 @@ public class ChannelSyncService
           return JSON.stringify(results);
         })()
         """;
-
+		
     // Direct, verified Gracenote TMS StationId table (East/Central/Mountain ID, Pacific ID)
     // Bypasses fuzzy text search completely for core national networks!
     private static readonly Dictionary<string, (string EastId, string WestId)> VerifiedGracenoteStationIds =
@@ -926,7 +941,7 @@ public class ChannelSyncService
         { "IFC",                        ("59444",  "59444") },
         { "Independent Film Channel",   ("59444",  "59444") },
         { "SundanceTV",                 ("71280",  "71280") },
-        { "Sundance TV",                ("71280",  "71280") },
+		{ "Sundance TV",                ("71280",  "71280") },
         { "WE tv",                      ("59296",  "59296") },
         { "A&E",                        ("51529",  "73992") },
         { "Arts and Entertainment",     ("51529",  "73992") },
@@ -956,7 +971,7 @@ public class ChannelSyncService
         { "CMT",                        ("59440",  "59440") },
         { "Logo",                       ("46762",  "46762") },
         { "Pop",                        ("68796",  "68796") },
-        { "Pop TV",                     ("68796",  "68796") },
+		{ "Pop TV",                     ("68796",  "68796") },
         { "Hallmark Channel",           ("66268",  "66268") },
         { "Hallmark Mystery",           ("61522",  "61522") },
         { "Hallmark Family",            ("105723", "105723") },
@@ -979,7 +994,7 @@ public class ChannelSyncService
         { "ION Media Networks",         ("62746",  "62746") },
         { "Reelz",                      ("119136", "119136") },
         { "UP (Uplifting Entertainment)",("66143", "66143") },
-        { "UPtv",                       ("66143",  "66143") },
+		{ "UPtv",                       ("66143",  "66143") },
 
         // Discovery / Nat Geo / Lifestyle
         { "Discovery Channel",          ("56905",  "56906") },
@@ -1060,8 +1075,8 @@ public class ChannelSyncService
         { "National Hockey League Network", ("58690", "58690") },
         { "Golf Channel",               ("61854",  "61854") },
         { "Tennis Channel",             ("60316",  "60316") },
-
-        // Premium (Starz family, as titled in the Sling guide; East and West are separate channels there)
+		
+		// Premium (Starz family, as titled in the Sling guide; East and West are separate channels there)
         { "STARZ",                      ("34941",  "34941") },
         { "Starz West",                 ("34949",  "34949") },
         { "Starz Kids & Family",        ("57581",  "57581") },
@@ -1091,8 +1106,7 @@ public class ChannelSyncService
 		{ "AWE",                        ("59436",  "59436") },
         { "HBCU GO",                    ("125163", "125163") },
         { "HSN",                        ("62077",  "62077") },
-
-        // Xfinity premium callSigns (matched against the stream URL; callSigns keep legacy names, e.g. HBO2H = HBO Hits)
+		 // Xfinity premium callSigns (matched against the stream URL; callSigns keep legacy names, e.g. HBO2H = HBO Hits)
         { "HBOHD",                      ("19548",  "19548") },
         { "HBO-W",                      ("10244",  "10244") },
         { "HBO2H",                      ("59368",  "59368") },
@@ -1111,7 +1125,7 @@ public class ChannelSyncService
         { "MGMMR",                      ("74073",  "74073") },
         { "MGMDR",                      ("103828", "103828") }
     };
-
+    
     private static async Task<int> MatchGracenoteStationsAsync(
         List<ProviderChannel> channels,
         string dvrIp,
@@ -1125,8 +1139,8 @@ public class ChannelSyncService
         // Pacific (UTC-8), Alaska (UTC-9), Hawaii (UTC-10) use West/Pacific feeds;
         // Eastern (UTC-5), Central (UTC-6), and Mountain (UTC-7) use East feeds on YTTV.
         bool preferPacific = TimeZoneInfo.Local.BaseUtcOffset.TotalHours <= -8.0;
-
-        int hiddenCount = channels.Count(c => c.IsHidden && string.IsNullOrWhiteSpace(c.StationId));
+		
+		int hiddenCount = channels.Count(c => c.IsHidden && string.IsNullOrWhiteSpace(c.StationId));
         if (hiddenCount > 0)
             log($"[Gracenote] Skipping {hiddenCount} hidden channels (unhide them and scan again to match their Gracenote IDs)");
 
@@ -1140,8 +1154,8 @@ public class ChannelSyncService
                 updatedCount++;
                 continue;
             }
-
-            if (ch.IsHidden)
+			
+			if (ch.IsHidden)
                 continue;
 
             string rawName = ch.Name.Trim();
@@ -1161,6 +1175,7 @@ public class ChannelSyncService
             }
 
             // 2. Skip vague local affiliate names that lack real FCC call letters (e.g. "FOX 46", "CW Charlotte", "TV64", "PBS NC", "SCETV")
+            
             if (string.IsNullOrWhiteSpace(urlCallSign) && IsVagueLocalStationName(rawName))
             {
                 log($"[Gracenote] [--] {ch.Name}: Local station without FCC call letters (leaving blank for manual mapping in Channels DVR)");

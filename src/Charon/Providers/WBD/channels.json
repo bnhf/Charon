@@ -1,0 +1,122 @@
+[
+  {
+    "id": "hgtv",
+    "name": "HGTV",
+    "channelNumber": "229",
+    "stationId": "49788",
+    "url": "https://watch.hgtv.com/channel/hgtv",
+    "isHidden": true
+  },
+  {
+    "id": "food-network",
+    "name": "Food Network",
+    "channelNumber": "231",
+    "stationId": "50747",
+    "url": "https://watch.hgtv.com/channel/food-network",
+    "isHidden": true
+  },
+  {
+    "id": "tlc",
+    "name": "TLC",
+    "channelNumber": "280",
+    "stationId": "57391",
+    "url": "https://watch.hgtv.com/channel/tlc",
+    "isHidden": true
+  },
+  {
+    "id": "investigation-discovery",
+    "name": "Investigation Discovery",
+    "channelNumber": "285",
+    "stationId": "65342",
+    "url": "https://watch.hgtv.com/channel/investigation-discovery",
+    "isHidden": true
+  },
+  {
+    "id": "discovery",
+    "name": "Discovery Channel",
+    "channelNumber": "278",
+    "stationId": "56905",
+    "url": "https://watch.hgtv.com/channel/discovery",
+    "isHidden": true
+  },
+  {
+    "id": "cooking-channel",
+    "name": "Cooking Channel",
+    "channelNumber": "232",
+    "stationId": "68065",
+    "url": "https://watch.hgtv.com/channel/cooking-channel",
+    "isHidden": true
+  },
+  {
+    "id": "travel-channel",
+    "name": "Travel Channel",
+    "channelNumber": "277",
+    "stationId": "59303",
+    "url": "https://watch.hgtv.com/channel/travel-channel",
+    "isHidden": true
+  },
+  {
+    "id": "magnolia-network",
+    "name": "Magnolia Network",
+    "channelNumber": "230",
+    "stationId": "67454",
+    "url": "https://watch.hgtv.com/channel/magnolia-network",
+    "isHidden": true
+  },
+  {
+    "id": "own",
+    "name": "OWN",
+    "channelNumber": "279",
+    "stationId": "70388",
+    "url": "https://watch.hgtv.com/channel/own",
+    "isHidden": true
+  },
+  {
+    "id": "animal-planet",
+    "name": "Animal Planet",
+    "channelNumber": "282",
+    "stationId": "57394",
+    "url": "https://watch.hgtv.com/channel/animal-planet",
+    "isHidden": true
+  },
+  {
+    "id": "discovery-life",
+    "name": "Discovery Life",
+    "channelNumber": "261",
+    "stationId": "92204",
+    "url": "https://watch.hgtv.com/channel/discovery-life",
+    "isHidden": true
+  },
+  {
+    "id": "science",
+    "name": "Science Channel",
+    "channelNumber": "284",
+    "stationId": "57390",
+    "url": "https://watch.hgtv.com/channel/science",
+    "isHidden": true
+  },
+  {
+    "id": "ahc",
+    "name": "American Heroes Channel",
+    "channelNumber": "287",
+    "stationId": "78808",
+    "url": "https://watch.hgtv.com/channel/ahc",
+    "isHidden": true
+  },
+  {
+    "id": "motortrend",
+    "name": "MotorTrend",
+    "channelNumber": "281",
+    "stationId": "31046",
+    "url": "https://watch.hgtv.com/channel/motortrend",
+    "isHidden": true
+  },
+  {
+    "id": "destination-america",
+    "name": "Destination America",
+    "channelNumber": "286",
+    "stationId": "60468",
+    "url": "https://watch.hgtv.com/channel/destination-america",
+    "isHidden": true
+  }
+]
