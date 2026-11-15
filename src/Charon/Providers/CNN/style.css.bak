@@ -1,0 +1,19 @@
+html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  overflow: hidden !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                }
+                header, footer, nav,
+                .header, .footer,
+                [class*="header" i],
+                [class*="nav" i],
+                [class*="control-bar" i],
+                [class*="controls" i],
+                [data-testid*="controls" i],
+                #onetrust-consent-sdk {
+                  opacity: 0 !important;
+                }

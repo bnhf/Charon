@@ -1,0 +1,8 @@
+{
+  "id": "cnn",
+  "name": "CNN (TVE)",
+  "groupTitle": "CNN (TVE)",
+  "enabled": true,
+  "loginUrl": "https://www.cnn.com/live",
+  "tuneScriptDelayMs": 1500
+}

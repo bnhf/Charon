@@ -68,12 +68,14 @@ public class ProviderManager
         string defaultSlingDir = Path.Combine(_providersRoot, "Sling");
 		string defaultPhiloDir = Path.Combine(_providersRoot, "Philo");
 		string defaultWbdDir = Path.Combine(_providersRoot, "WBD");
+		string defaultCnnDir = Path.Combine(_providersRoot, "CNN");
         Directory.CreateDirectory(defaultYttvDir);
         Directory.CreateDirectory(defaultSpectrumDir);
 		Directory.CreateDirectory(defaultXfinityDir);
         Directory.CreateDirectory(defaultSlingDir);
 		Directory.CreateDirectory(defaultPhiloDir);
 		Directory.CreateDirectory(defaultWbdDir);
+		Directory.CreateDirectory(defaultCnnDir);
 
         // If someone placed channels.json directly in Providers\ root instead of Providers\YouTubeTV\, move/copy it into Providers\YouTubeTV\
         string rootChannelsFile = Path.Combine(_providersRoot, "channels.json");
@@ -100,6 +102,7 @@ public class ProviderManager
         bool isSling = folderName.Equals("Sling", StringComparison.OrdinalIgnoreCase);
 		bool isPhilo = folderName.Equals("Philo", StringComparison.OrdinalIgnoreCase);
         bool isWbd = folderName.Equals("WBD", StringComparison.OrdinalIgnoreCase);
+		bool isCnn = folderName.Equals("CNN", StringComparison.OrdinalIgnoreCase);
 
         string manifestPath = Path.Combine(dir, "provider.json");
         string altManifestPath = Path.Combine(dir, "manifest.json");
@@ -107,7 +110,15 @@ public class ProviderManager
         string tuneJsPath = Path.Combine(dir, "tune.js");
         string styleCssPath = Path.Combine(dir, "style.css");
 
-        string defaultName = isYttv ? "YouTube TV" : isSpectrum ? "Spectrum TV" : isXfinity ? "Xfinity Stream" : isSling ? "Sling TV" : isPhilo ? "Philo" : isWbd ? "WB-Discovery (TVE)" : folderName;
+        string defaultName = isYttv ? "YouTube TV" 
+		    : isSpectrum ? "Spectrum TV" 
+			: isXfinity ? "Xfinity Stream" 
+			: isSling ? "Sling TV" 
+			: isPhilo ? "Philo" 
+			: isWbd ? "WB-Discovery (TVE)" 
+			: isCnn ? "CNN (TVE)" 
+			: folderName;
+			
         string defaultLoginUrl = isSpectrum
             ? "https://watch.spectrum.net/guide"
             : isXfinity
@@ -118,6 +129,8 @@ public class ProviderManager
             ? "https://www.philo.com/player"
             : isWbd
             ? "https://watch.hgtv.com/channel/hgtv"
+			: isCnn
+            ? "https://www.cnn.com/live"
             : "https://tv.youtube.com";
         int defaultDelayMs = isSpectrum || isSling || isPhilo ? 2000 : 1500;
 
@@ -269,6 +282,38 @@ public class ProviderManager
                     ]
                     """;
                 File.WriteAllText(channelsPath, wbdDefaultChannels, new UTF8Encoding(false));
+            }
+			else if (isCnn)
+            {
+                const string cnnDefaultChannels = """
+                    [
+                      {
+                        "id": "cnn",
+                        "name": "CNN",
+                        "channelNumber": "200",
+                        "stationId": "58646",
+                        "url": "https://www.cnn.com/videos/cnn",
+                        "isHidden": true
+                      },
+                      {
+                        "id": "cnni",
+                        "name": "CNN International",
+                        "channelNumber": "201",
+                        "stationId": "10146",
+                        "url": "https://www.cnn.com/videos/cnn-i",
+                        "isHidden": true
+                      },
+                      {
+                        "id": "hln",
+                        "name": "HLN",
+                        "channelNumber": "202",
+                        "stationId": "64549",
+                        "url": "https://www.cnn.com/videos/hln",
+                        "isHidden": true
+                      }
+                    ]
+                    """;
+                File.WriteAllText(channelsPath, cnnDefaultChannels, new UTF8Encoding(false));
             }
             else
             {
@@ -1281,6 +1326,201 @@ public class ProviderManager
                 })();
                 """;
             File.WriteAllText(tuneJsPath, wbdTuneJs, new UTF8Encoding(false));
+        }
+		
+		if (isCnn)
+        {
+            const string cnnStyleCss = """
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  overflow: hidden !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                }
+                *:has(video) {
+                  transform: none !important;
+                  filter: none !important;
+                  perspective: none !important;
+                  contain: none !important;
+                  isolation: auto !important;
+                  z-index: 2147483647 !important;
+                  background: #000 !important;
+                }
+                video {
+                  position: fixed !important;
+                  inset: 0 !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  max-width: none !important;
+                  max-height: none !important;
+                  margin: 0 !important;
+                  object-fit: fill !important;
+                  z-index: 2147483647 !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                }
+                header, footer, nav,
+                .header, .footer,
+                [class*="control-bar" i],
+                [class*="controls" i],
+                [data-testid*="controls" i],
+                #onetrust-consent-sdk {
+                  opacity: 0 !important;
+                }
+                """;
+            File.WriteAllText(styleCssPath, cnnStyleCss, new UTF8Encoding(false));
+
+            const string cnnTuneJs = """
+                (function () {
+                  try {
+                    const blockHeavyCodecs = (mimeType) => {
+                      if (typeof mimeType !== 'string') return false;
+                      return mimeType.toLowerCase().includes('av01');
+                    };
+                    if (window.MediaSource && !window.__charonCodecLocked) {
+                      window.__charonCodecLocked = true;
+                      const origIsTypeSupported = window.MediaSource.isTypeSupported.bind(window.MediaSource);
+                      window.MediaSource.isTypeSupported = function (mimeType) {
+                        if (blockHeavyCodecs(mimeType)) return false;
+                        return origIsTypeSupported(mimeType);
+                      };
+                    }
+                    if (window.HTMLMediaElement && !window.__charonCanPlayLocked) {
+                      window.__charonCanPlayLocked = true;
+                      const origCanPlayType = window.HTMLMediaElement.prototype.canPlayType;
+                      window.HTMLMediaElement.prototype.canPlayType = function (mimeType) {
+                        if (blockHeavyCodecs(mimeType)) return '';
+                        return origCanPlayType.call(this, mimeType);
+                      };
+                    }
+                    if (navigator.userActivation) {
+                      Object.defineProperty(navigator.userActivation, 'isActive', { get: () => true });
+                      Object.defineProperty(navigator.userActivation, 'hasBeenActive', { get: () => true });
+                    }
+                    if (window.HTMLVideoElement && !window.__charonQualityLocked) {
+                      window.__charonQualityLocked = true;
+                      const origGetQuality = window.HTMLVideoElement.prototype.getVideoPlaybackQuality;
+                      if (origGetQuality) {
+                        window.HTMLVideoElement.prototype.getVideoPlaybackQuality = function () {
+                          const q = origGetQuality.call(this);
+                          return {
+                            creationTime: q.creationTime,
+                            totalVideoFrames: q.totalVideoFrames,
+                            droppedVideoFrames: 0,
+                            corruptedVideoFrames: 0
+                          };
+                        };
+                      }
+                    }
+                  } catch {}
+
+                  const injectStaticCss = () => {
+                    if (!document.getElementById('charon-static-css') && (document.head || document.documentElement)) {
+                      const s = document.createElement('style');
+                      s.id = 'charon-static-css';
+                      s.textContent = `
+                        html, body { background: #000 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; cursor: none !important; }
+                        *:has(video) { transform: none !important; filter: none !important; perspective: none !important; contain: none !important; z-index: 2147483647 !important; background: #000 !important; }
+                        video { position: fixed !important; inset: 0 !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; margin: 0 !important; object-fit: fill !important; z-index: 2147483647 !important; background: #000 !important; cursor: none !important; }
+                        header, footer, nav,
+                        .header, .footer,
+                        [class*="control-bar" i],
+                        [class*="controls" i],
+                        [data-testid*="controls" i],
+                        #onetrust-consent-sdk {
+                          opacity: 0 !important;
+                        }
+                      `;
+                      (document.head || document.documentElement).appendChild(s);
+                    }
+                  };
+
+                  const findMainVideo = () =>
+                    Array.from(document.querySelectorAll('video'))
+                      .sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight))[0];
+
+                  window.__charonIsPaused = () => {
+                    const v = findMainVideo();
+                    if (!v) return false;
+                    return v.paused;
+                  };
+
+                  const checkPlayer = () => {
+                    injectStaticCss();
+
+                    const allVideos = Array.from(document.querySelectorAll('video'));
+                    if (allVideos.length === 0) return;
+
+                    for (const v of allVideos) {
+                      if (v.muted || v.volume === 0) {
+                        const unmuteBtn = document.querySelector(
+                          'button[aria-label*="Unmute" i], ' +
+                          'button[title*="Unmute" i], ' +
+                          '[class*="unmute" i], ' +
+                          '[data-testid*="unmute" i]'
+                        );
+                        if (unmuteBtn) unmuteBtn.click();
+                        v.muted = false;
+                        v.volume = 1.0;
+                      } else if (v.volume < 1.0) {
+                        v.volume = 1.0;
+                      }
+
+                      if (v.paused && (v.src || v.currentSrc || v.readyState >= 1)) {
+                        const playBtn = document.querySelector(
+                          'button[aria-label*="Play" i], ' +
+                          'button[title*="Play" i], ' +
+                          '[data-testid*="play" i]'
+                        );
+                        if (playBtn) playBtn.click();
+                        v.play().catch(() => {});
+                      }
+                    }
+
+                    const activeVideo = findMainVideo();
+                    if (!activeVideo) return;
+
+                    for (const v of allVideos) {
+                      if (v !== activeVideo && !v.paused) {
+                        v.muted = true;
+                        try { v.pause(); } catch {}
+                      }
+                    }
+
+                    if (!activeVideo.__charonStyled) {
+                      activeVideo.__charonStyled = true;
+                      activeVideo.style.cssText = [
+                        'background: black !important',
+                        'cursor: none !important',
+                        'display: block !important',
+                        'height: 100vh !important',
+                        'width: 100vw !important',
+                        'left: 0 !important',
+                        'top: 0 !important',
+                        'margin: 0 !important',
+                        'max-height: none !important',
+                        'max-width: none !important',
+                        'object-fit: fill !important',
+                        'position: fixed !important',
+                        'z-index: 2147483647 !important'
+                      ].join('; ');
+                    }
+                  };
+
+                  checkPlayer();
+
+                  if (window.__charonTunerActive) return;
+                  window.__charonTunerActive = true;
+
+                  setInterval(checkPlayer, 300);
+                })();
+                """;
+            File.WriteAllText(tuneJsPath, cnnTuneJs, new UTF8Encoding(false));
         }
 
         ProviderManifest? manifest = null;

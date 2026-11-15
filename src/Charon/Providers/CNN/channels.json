@@ -1,0 +1,26 @@
+[
+  {
+    "id": "cnn",
+    "name": "CNN",
+    "channelNumber": "200",
+    "stationId": "58646",
+    "url": "https://www.cnn.com/videos/cnn",
+    "isHidden": true
+  },
+  {
+    "id": "cnni",
+    "name": "CNN International",
+    "channelNumber": "201",
+    "stationId": "10146",
+    "url": "https://www.cnn.com/videos/cnn-i",
+    "isHidden": true
+  },
+  {
+    "id": "hln",
+    "name": "HLN",
+    "channelNumber": "202",
+    "stationId": "64549",
+    "url": "https://www.cnn.com/videos/hln",
+    "isHidden": true
+  }
+]
