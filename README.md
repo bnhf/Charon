@@ -17,6 +17,7 @@ Charon is a C# browser-based tuner bridge designed to manage, tune, and stream l
 
 - **Multi-Tuner Virtual Tuner Pool:** Supports up to 4 simultaneous concurrent virtual browser tuners with off-screen window placement and GPU/DWM window-staggering to prevent compositor occlusion and resource contention.
 - **Out-of-the-Box Provider Modules:** Pre-configured support for **YouTube TV**, **Spectrum TV**, **Xfinity**, **Sling TV**, and **Philo**, complete with custom CSS styling, automated unmuting, full-bleed viewport locks, and channel tuning scripts.
+- **Pre-configured TVE Providers:** **CNN** and **Warner-Discovery** TVE channels complete with custom CSS styling, automated unmuting, full-bleed viewport locks, and channel tuning scripts.
 - **Embedded Web Management Dashboard:** Complete remote control accessible from any browser at `http://<IP>:48590`—allowing lineup editing, setting adjustments, log monitoring, and lineup scans without accessing the host machine directly.
 - **Interactive Channel Lineup Editor:** Built-in DataGrid and Raw JSON editor for `channels.json` with inline channel searching, bulk hide/show toggles, channel renumbering, and custom Gracenote station ID mapping.
 - **Automated Guide Matching (Gracenote / TMS):** Automated scraping and integration with your local Channels DVR server to automatically match web channels to Gracenote Station IDs.
@@ -47,6 +48,9 @@ Charon supports five major streaming providers out of the box:
    - **Xfinity**
    - **Sling TV**
    - **Philo**
+ 4. Or select network TVE provider:
+   - **Warner-Discovery**
+   - **CNN**
 
 ---
 
@@ -67,6 +71,8 @@ Before tuning or scanning channels, Charon needs an active session:
 ### Step 4: Scanning and Loading `channels.json`
 
 Once authenticated, pull your live channel lineup directly into Charon:
+
+*(Not required for TVE channels)
 
 1. Click the **"2. Scan & Sync Lineup"** button.
 2. **Behavior by Provider:**
