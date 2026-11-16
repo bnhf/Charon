@@ -180,7 +180,10 @@
                                         Padding="10,4" Background="#3F3F46" Foreground="#F4F4F5" BorderThickness="0" Margin="0,0,6,0"
                                         ToolTip="Enables all highlighted rows in the M3U playlist"/>
                                 <Button Content="Show All" Click="BtnShowAll_Click"
-                                        Padding="10,4" Background="#3F3F46" Foreground="#38BDF8" BorderThickness="0"/>
+                                        Padding="10,4" Background="#3F3F46" Foreground="#38BDF8" BorderThickness="0" Margin="0,0,6,0"/>
+                                <Button Content="Hide All" Click="BtnHideAll_Click"
+                                        Padding="10,4" Background="#3F3F46" Foreground="#FCA5A5" BorderThickness="0"
+                                        ToolTip="Hides all channels from the M3U playlist"/>
                             </StackPanel>
 
                             <TextBlock x:Name="TxtLineupStats" Grid.Column="3" Text="0 active in M3U (0 hidden)"

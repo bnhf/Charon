@@ -342,6 +342,15 @@ _server.ConfigOrLineupChanged += () => Dispatcher.InvokeAsync(() =>
         CollectionViewSource.GetDefaultView(GridChannels.ItemsSource)?.Refresh();
         UpdateLineupStats();
     }
+	
+	private void BtnHideAll_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var ch in _editableChannels)
+            ch.IsHidden = true;
+
+        CollectionViewSource.GetDefaultView(GridChannels.ItemsSource)?.Refresh();
+        UpdateLineupStats();
+    }
 
     private void UpdateLineupStats()
     {
