@@ -1,0 +1,8 @@
+{
+  "id": "hulu",
+  "name": "Hulu + Live TV",
+  "groupTitle": "Hulu + Live TV",
+  "enabled": true,
+  "loginUrl": "https://www.hulu.com/live",
+  "tuneScriptDelayMs": 2000
+}
