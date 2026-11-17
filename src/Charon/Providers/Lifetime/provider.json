@@ -1,0 +1,8 @@
+{
+  "id": "lifetime",
+  "name": "Lifetime (TVE)",
+  "groupTitle": "Lifetime (TVE)",
+  "enabled": true,
+  "loginUrl": "https://play.mylifetime.com/live",
+  "tuneScriptDelayMs": 1500
+}

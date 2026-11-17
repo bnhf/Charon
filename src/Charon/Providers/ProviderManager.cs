@@ -69,6 +69,12 @@ public class ProviderManager
 		string defaultPhiloDir = Path.Combine(_providersRoot, "Philo");
 		string defaultWbdDir = Path.Combine(_providersRoot, "WBD");
 		string defaultCnnDir = Path.Combine(_providersRoot, "CNN");
+		string defaultNbcDir = Path.Combine(_providersRoot, "NBC");
+		string defaultHistoryDir = Path.Combine(_providersRoot, "History");
+        string defaultAetvDir = Path.Combine(_providersRoot, "AETV");
+        string defaultLifetimeDir = Path.Combine(_providersRoot, "Lifetime");
+		string defaultUsaDir = Path.Combine(_providersRoot, "USA");
+		
         Directory.CreateDirectory(defaultYttvDir);
         Directory.CreateDirectory(defaultSpectrumDir);
 		Directory.CreateDirectory(defaultXfinityDir);
@@ -76,7 +82,12 @@ public class ProviderManager
 		Directory.CreateDirectory(defaultPhiloDir);
 		Directory.CreateDirectory(defaultWbdDir);
 		Directory.CreateDirectory(defaultCnnDir);
-
+		Directory.CreateDirectory(defaultNbcDir);
+		Directory.CreateDirectory(defaultHistoryDir);
+        Directory.CreateDirectory(defaultAetvDir);
+        Directory.CreateDirectory(defaultLifetimeDir);
+		Directory.CreateDirectory(defaultUsaDir);
+		
         // If someone placed channels.json directly in Providers\ root instead of Providers\YouTubeTV\, move/copy it into Providers\YouTubeTV\
         string rootChannelsFile = Path.Combine(_providersRoot, "channels.json");
         if (File.Exists(rootChannelsFile))
@@ -103,6 +114,12 @@ public class ProviderManager
 		bool isPhilo = folderName.Equals("Philo", StringComparison.OrdinalIgnoreCase);
         bool isWbd = folderName.Equals("WBD", StringComparison.OrdinalIgnoreCase);
 		bool isCnn = folderName.Equals("CNN", StringComparison.OrdinalIgnoreCase);
+		bool isNbc = folderName.Equals("NBC", StringComparison.OrdinalIgnoreCase);
+		bool isHistory = folderName.Equals("History", StringComparison.OrdinalIgnoreCase);
+        bool isAetv = folderName.Equals("AETV", StringComparison.OrdinalIgnoreCase);
+        bool isLifetime = folderName.Equals("Lifetime", StringComparison.OrdinalIgnoreCase);
+        bool isAeFamily = isHistory || isAetv || isLifetime;
+		bool isUsa = folderName.Equals("USA", StringComparison.OrdinalIgnoreCase);
 
         string manifestPath = Path.Combine(dir, "provider.json");
         string altManifestPath = Path.Combine(dir, "manifest.json");
@@ -117,6 +134,11 @@ public class ProviderManager
 			: isPhilo ? "Philo" 
 			: isWbd ? "WB-Discovery (TVE)" 
 			: isCnn ? "CNN (TVE)" 
+			: isNbc ? "NBCUniversal (TVE)"
+			: isHistory ? "History (TVE)"
+            : isAetv ? "A&E (TVE)"
+            : isLifetime ? "Lifetime (TVE)"
+			: isUsa ? "USA Network (TVE)"
 			: folderName;
 			
         string defaultLoginUrl = isSpectrum
@@ -131,6 +153,16 @@ public class ProviderManager
             ? "https://watch.hgtv.com/channel/hgtv"
 			: isCnn
             ? "https://www.cnn.com/live"
+			: isNbc 
+			? "https://www.nbc.com/live"
+			: isHistory
+            ? "https://play.history.com/live"
+            : isAetv
+            ? "https://play.aetv.com/live"
+            : isLifetime
+            ? "https://play.mylifetime.com/live"
+			: isUsa
+            ? "https://www.usanetwork.com/live"
             : "https://tv.youtube.com";
         int defaultDelayMs = isSpectrum || isSling || isPhilo ? 2000 : 1500;
 
@@ -314,6 +346,78 @@ public class ProviderManager
                     ]
                     """;
                 File.WriteAllText(channelsPath, cnnDefaultChannels, new UTF8Encoding(false));
+            }
+			else if (isHistory)
+            {
+                const string historyDefaultChannels = """
+                    [
+                      {
+                        "id": "history",
+                        "name": "History",
+                        "channelNumber": "240",
+                        "stationId": "57708",
+                        "url": "https://play.history.com/live",
+                        "isHidden": true
+                      }
+                    ]
+                    """;
+                File.WriteAllText(channelsPath, historyDefaultChannels, new UTF8Encoding(false));
+            }
+            else if (isAetv)
+            {
+                const string aetvDefaultChannels = """
+                    [
+                      {
+                        "id": "aetv",
+                        "name": "A&E",
+                        "channelNumber": "241",
+                        "stationId": "51529",
+                        "url": "https://play.aetv.com/live",
+                        "isHidden": true
+                      }
+                    ]
+                    """;
+                File.WriteAllText(channelsPath, aetvDefaultChannels, new UTF8Encoding(false));
+            }
+            else if (isLifetime)
+            {
+                const string lifetimeDefaultChannels = """
+                    [
+                      {
+                        "id": "lifetime",
+                        "name": "Lifetime",
+                        "channelNumber": "242",
+                        "stationId": "60150",
+                        "url": "https://play.mylifetime.com/live",
+                        "isHidden": true
+                      }
+                    ]
+                    """;
+                File.WriteAllText(channelsPath, lifetimeDefaultChannels, new UTF8Encoding(false));
+            }
+			else if (isUsa)
+            {
+                const string usaDefaultChannels = """
+                    [
+                      {
+                        "id": "usa-east",
+                        "name": "USA Network (East)",
+                        "channelNumber": "245",
+                        "stationId": "58452",
+                        "url": "https://www.usanetwork.com/live",
+                        "isHidden": true
+                      },
+                      {
+                        "id": "usa-west",
+                        "name": "USA Network (West)",
+                        "channelNumber": "246",
+                        "stationId": "74030",
+                        "url": "https://www.usanetwork.com/live",
+                        "isHidden": true
+                      }
+                    ]
+                    """;
+                File.WriteAllText(channelsPath, usaDefaultChannels, new UTF8Encoding(false));
             }
             else
             {
@@ -1543,6 +1647,472 @@ public class ProviderManager
             };
             File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, JsonOptions), new UTF8Encoding(false));
         }
+		
+		if (isNbc)
+        {
+            const string nbcStyleCss = """
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  overflow: hidden !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                }
+
+                /* Keep the video player container and its ancestors free of transform/contain traps */
+                *:has(video) {
+                  transform: none !important;
+                  contain: none !important;
+                }
+
+                video {
+                  position: fixed !important;
+                  inset: 0 !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  margin: 0 !important;
+                  max-width: none !important;
+                  max-height: none !important;
+                  object-fit: fill !important;
+                  z-index: 2147483647 !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                  opacity: 1 !important;
+                }
+
+                /* Hide the lower guide grid, filter bar, footer, and player HUD with opacity: 0
+                   so NBC's layout/measurement math runs at full speed while rendering pitch-black */
+                section.links-selectable-group,
+                .live-page__links-selectable-group,
+                .livePage__filter,
+                .live-guide__wrapper,
+                .live-guide__nav,
+                .live-guide__schedules,
+                .live-guide__streams,
+                .live-guide__inner,
+                footer.footer,
+                .footer,
+                #onetrust-consent-sdk,
+                .video-overlay,
+                .brand-header,
+                .video-player__controls,
+                [class*="header" i],
+                [class*="controls" i] {
+                  opacity: 0 !important;
+                  pointer-events: none !important;
+                }
+                """;
+            File.WriteAllText(styleCssPath, nbcStyleCss, new UTF8Encoding(false));
+
+            const string nbcTuneJs = """
+                (function () {
+                  try {
+                    const blockHeavyCodecs = (mimeType) => {
+                      if (typeof mimeType !== 'string') return false;
+                      return mimeType.toLowerCase().includes('av01');
+                    };
+                    if (window.MediaSource && !window.__charonCodecLocked) {
+                      window.__charonCodecLocked = true;
+                      const origIsTypeSupported = window.MediaSource.isTypeSupported.bind(window.MediaSource);
+                      window.MediaSource.isTypeSupported = function (mimeType) {
+                        if (blockHeavyCodecs(mimeType)) return false;
+                        return origIsTypeSupported(mimeType);
+                      };
+                    }
+                    if (window.HTMLMediaElement && !window.__charonCanPlayLocked) {
+                      window.__charonCanPlayLocked = true;
+                      const origCanPlayType = window.HTMLMediaElement.prototype.canPlayType;
+                      window.HTMLMediaElement.prototype.canPlayType = function (mimeType) {
+                        if (blockHeavyCodecs(mimeType)) return '';
+                        return origCanPlayType.call(this, mimeType);
+                      };
+                    }
+                    if (navigator.userActivation) {
+                      Object.defineProperty(navigator.userActivation, 'isActive', { get: () => true });
+                      Object.defineProperty(navigator.userActivation, 'hasBeenActive', { get: () => true });
+                    }
+                  } catch {}
+
+                  const injectStaticCss = () => {
+                    if (!document.getElementById('charon-static-css') && (document.head || document.documentElement)) {
+                      const s = document.createElement('style');
+                      s.id = 'charon-static-css';
+                      s.textContent = `
+                        html, body { background: #000 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; cursor: none !important; }
+                        *:has(video) { transform: none !important; contain: none !important; }
+                        video { position: fixed !important; inset: 0 !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; margin: 0 !important; max-width: none !important; max-height: none !important; object-fit: fill !important; z-index: 2147483647 !important; background: #000 !important; cursor: none !important; opacity: 1 !important; }
+                        section.links-selectable-group, .live-page__links-selectable-group, .livePage__filter,
+                        .live-guide__wrapper, .live-guide__nav, .live-guide__schedules, .live-guide__streams, .live-guide__inner,
+                        footer.footer, .footer, #onetrust-consent-sdk, .video-overlay, .brand-header, .video-player__controls,
+                        [class*="header" i], [class*="controls" i] {
+                          opacity: 0 !important; pointer-events: none !important;
+                        }
+                      `;
+                      (document.head || document.documentElement).appendChild(s);
+                    }
+                  };
+
+                  const checkPlayer = () => {
+                    injectStaticCss();
+
+                    const v = document.querySelector('video');
+                    if (!v) return;
+
+                    if (v.muted || v.volume === 0) {
+                      const unmute = document.querySelector('button[aria-label*="Unmute" i], [class*="unmute" i]');
+                      if (unmute) unmute.click();
+                      v.muted = false;
+                      v.volume = 1.0;
+                    } else if (v.volume < 1.0) {
+                      v.volume = 1.0;
+                    }
+
+                    if (v.paused && v.readyState >= 1) {
+                      const play = document.querySelector('button[aria-label*="Play" i]');
+                      if (play) play.click();
+                      v.play().catch(() => {});
+                    }
+                  };
+
+                  checkPlayer();
+
+                  if (window.__charonTunerActive) return;
+                  window.__charonTunerActive = true;
+
+                  setInterval(checkPlayer, 300);
+                })();
+                """;
+            File.WriteAllText(tuneJsPath, nbcTuneJs, new UTF8Encoding(false));
+        }
+		
+		if (isAeFamily)
+        {
+            const string aeStyleCss = """
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  overflow: hidden !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                }
+                *:has(video) {
+                  transform: none !important;
+                  contain: none !important;
+                }
+                video {
+                  position: fixed !important;
+                  inset: 0 !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  margin: 0 !important;
+                  max-width: none !important;
+                  max-height: none !important;
+                  object-fit: fill !important;
+                  z-index: 2147483647 !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                  opacity: 1 !important;
+                }
+                header, [class*="headerStack" i],
+                [class*="SkipToMainContent" i],
+                #engagement-wrapper,
+                footer, [class*="footer" i],
+                #onetrust-consent-sdk,
+                [class*="controls" i],
+                [class*="overlay" i] {
+                  opacity: 0 !important;
+                  pointer-events: none !important;
+                }
+                """;
+            File.WriteAllText(styleCssPath, aeStyleCss, new UTF8Encoding(false));
+
+            const string aeTuneJs = """
+                (function () {
+                  try {
+                    const blockHeavyCodecs = (mimeType) => {
+                      if (typeof mimeType !== 'string') return false;
+                      return mimeType.toLowerCase().includes('av01');
+                    };
+                    if (window.MediaSource && !window.__charonCodecLocked) {
+                      window.__charonCodecLocked = true;
+                      const origIsTypeSupported = window.MediaSource.isTypeSupported.bind(window.MediaSource);
+                      window.MediaSource.isTypeSupported = function (mimeType) {
+                        if (blockHeavyCodecs(mimeType)) return false;
+                        return origIsTypeSupported(mimeType);
+                      };
+                    }
+                    if (window.HTMLMediaElement && !window.__charonCanPlayLocked) {
+                      window.__charonCanPlayLocked = true;
+                      const origCanPlayType = window.HTMLMediaElement.prototype.canPlayType;
+                      window.HTMLMediaElement.prototype.canPlayType = function (mimeType) {
+                        if (blockHeavyCodecs(mimeType)) return '';
+                        return origCanPlayType.call(this, mimeType);
+                      };
+                    }
+                    if (navigator.userActivation) {
+                      Object.defineProperty(navigator.userActivation, 'isActive', { get: () => true });
+                      Object.defineProperty(navigator.userActivation, 'hasBeenActive', { get: () => true });
+                    }
+                  } catch {}
+
+                  const injectStaticCss = () => {
+                    if (!document.getElementById('charon-static-css') && (document.head || document.documentElement)) {
+                      const s = document.createElement('style');
+                      s.id = 'charon-static-css';
+                      s.textContent = `
+                        html, body { background: #000 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; cursor: none !important; }
+                        *:has(video) { transform: none !important; contain: none !important; }
+                        video { position: fixed !important; inset: 0 !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; margin: 0 !important; max-width: none !important; max-height: none !important; object-fit: fill !important; z-index: 2147483647 !important; background: #000 !important; cursor: none !important; opacity: 1 !important; }
+                        header, [class*="headerStack" i], [class*="SkipToMainContent" i], #engagement-wrapper, footer, [class*="footer" i], #onetrust-consent-sdk, [class*="controls" i], [class*="overlay" i] {
+                          opacity: 0 !important; pointer-events: none !important;
+                        }
+                      `;
+                      (document.head || document.documentElement).appendChild(s);
+                    }
+                  };
+
+                  const findMainVideo = () =>
+                    Array.from(document.querySelectorAll('video'))
+                      .sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight))[0];
+
+                  window.__charonIsPaused = () => {
+                    const v = findMainVideo();
+                    if (!v) return false;
+                    return v.paused;
+                  };
+
+                  const checkPlayer = () => {
+                    injectStaticCss();
+
+                    const v = findMainVideo();
+                    if (!v) return;
+
+                    // 1. Play FIRST while muted so Chrome autoplay never blocks it
+                    if (v.paused) {
+                      const playBtn = document.querySelector(
+                        'button[aria-label*="Play" i], button[title*="Play" i], [class*="play" i]'
+                      );
+                      if (playBtn) playBtn.click();
+                      v.play().catch(() => {});
+                    }
+
+                    // 2. Unmute once playing
+                    if (!v.paused && (v.muted || v.volume === 0)) {
+                      const unmuteBtn = document.querySelector(
+                        'button[aria-label*="Unmute" i], button[title*="Unmute" i], [class*="unmute" i]'
+                      );
+                      if (unmuteBtn) unmuteBtn.click();
+                      v.muted = false;
+                      v.volume = 1.0;
+                    } else if (!v.paused && v.volume < 1.0) {
+                      v.volume = 1.0;
+                    }
+
+                    if (!v.__charonStyled) {
+                      v.__charonStyled = true;
+                      v.style.cssText = [
+                        'background: black !important',
+                        'cursor: none !important',
+                        'display: block !important',
+                        'height: 100vh !important',
+                        'width: 100vw !important',
+                        'left: 0 !important',
+                        'top: 0 !important',
+                        'margin: 0 !important',
+                        'max-height: none !important',
+                        'max-width: none !important',
+                        'object-fit: fill !important',
+                        'position: fixed !important',
+                        'z-index: 2147483647 !important'
+                      ].join('; ');
+                    }
+                  };
+
+                  checkPlayer();
+                  if (window.__charonTunerActive) return;
+                  window.__charonTunerActive = true;
+                  setInterval(checkPlayer, 300);
+                })();
+                """;
+            File.WriteAllText(tuneJsPath, aeTuneJs, new UTF8Encoding(false));
+        }
+		if (isUsa)
+        {
+            const string usaStyleCss = """
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  overflow: hidden !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                }
+
+                *:has(video) {
+                  transform: none !important;
+                  contain: none !important;
+                }
+
+                video, video#epg-player_html5_api, .vjs-tech {
+                  position: fixed !important;
+                  inset: 0 !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  margin: 0 !important;
+                  max-width: none !important;
+                  max-height: none !important;
+                  object-fit: fill !important;
+                  z-index: 2147483647 !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                  opacity: 1 !important;
+                }
+
+                /* Hide non-player page modules, headers/footers, and Video.js overlays */
+                .module-loader-wrapper:not(:has(video)),
+                header, footer, nav,
+                .vjs-control-bar,
+                .vjs-big-play-button,
+                .vjs-title-bar,
+                .vjs-poster,
+                .vjs-loading-spinner,
+                .vjs-text-track-display,
+                .vjs-text-track-display-ttml,
+                .vjs-modal-dialog,
+                .tvProviderImage,
+                #onetrust-consent-sdk {
+                  opacity: 0 !important;
+                  pointer-events: none !important;
+                }
+                """;
+            File.WriteAllText(styleCssPath, usaStyleCss, new UTF8Encoding(false));
+
+            const string usaTuneJs = """
+                (function () {
+                  try {
+                    const blockHeavyCodecs = (mimeType) => {
+                      if (typeof mimeType !== 'string') return false;
+                      return mimeType.toLowerCase().includes('av01');
+                    };
+                    if (window.MediaSource && !window.__charonCodecLocked) {
+                      window.__charonCodecLocked = true;
+                      const origIsTypeSupported = window.MediaSource.isTypeSupported.bind(window.MediaSource);
+                      window.MediaSource.isTypeSupported = function (mimeType) {
+                        if (blockHeavyCodecs(mimeType)) return false;
+                        return origIsTypeSupported(mimeType);
+                      };
+                    }
+                    if (window.HTMLMediaElement && !window.__charonCanPlayLocked) {
+                      window.__charonCanPlayLocked = true;
+                      const origCanPlayType = window.HTMLMediaElement.prototype.canPlayType;
+                      window.HTMLMediaElement.prototype.canPlayType = function (mimeType) {
+                        if (blockHeavyCodecs(mimeType)) return '';
+                        return origCanPlayType.call(this, mimeType);
+                      };
+                    }
+                    if (navigator.userActivation) {
+                      Object.defineProperty(navigator.userActivation, 'isActive', { get: () => true });
+                      Object.defineProperty(navigator.userActivation, 'hasBeenActive', { get: () => true });
+                    }
+                  } catch {}
+
+                  const injectStaticCss = () => {
+                    if (!document.getElementById('charon-static-css') && (document.head || document.documentElement)) {
+                      const s = document.createElement('style');
+                      s.id = 'charon-static-css';
+                      s.textContent = `
+                        html, body { background: #000 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; cursor: none !important; }
+                        *:has(video) { transform: none !important; contain: none !important; }
+                        video, video#epg-player_html5_api, .vjs-tech { position: fixed !important; inset: 0 !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; margin: 0 !important; max-width: none !important; max-height: none !important; object-fit: fill !important; z-index: 2147483647 !important; background: #000 !important; cursor: none !important; opacity: 1 !important; }
+                        .module-loader-wrapper:not(:has(video)), header, footer, nav, .vjs-control-bar, .vjs-big-play-button, .vjs-title-bar, .vjs-poster, .vjs-loading-spinner, .vjs-text-track-display, .vjs-text-track-display-ttml, .vjs-modal-dialog, .tvProviderImage, #onetrust-consent-sdk {
+                          opacity: 0 !important; pointer-events: none !important;
+                        }
+                      `;
+                      (document.head || document.documentElement).appendChild(s);
+                    }
+                  };
+
+                  const findMainVideo = () =>
+                    document.querySelector('video#epg-player_html5_api') ||
+                    document.querySelector('video.vjs-tech') ||
+                    Array.from(document.querySelectorAll('video'))
+                      .sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight))[0];
+
+                  window.__charonIsPaused = () => {
+                    const v = findMainVideo();
+                    if (!v) return false;
+                    return v.paused;
+                  };
+
+                  const checkPlayer = () => {
+                    injectStaticCss();
+
+                    const v = findMainVideo();
+                    if (!v) return;
+
+                    // 1. Play FIRST while muted so Chrome autoplay never blocks it
+                    if (v.paused) {
+                      const bigPlay = document.querySelector('button.vjs-big-play-button, .vjs-play-control.vjs-paused');
+                      if (bigPlay) bigPlay.click();
+                      v.play().catch(() => {});
+                    }
+
+                    // 2. Unmute once playing (both via Video.js mute button if muted and direct property)
+                    if (!v.paused && (v.muted || v.volume === 0)) {
+                      const muteBtn = document.querySelector('.vjs-mute-control.vjs-vol-0, button[title*="Unmute" i], button[aria-label*="Unmute" i]');
+                      if (muteBtn) muteBtn.click();
+                      v.muted = false;
+                      v.volume = 1.0;
+                    } else if (!v.paused && v.volume < 1.0) {
+                      v.volume = 1.0;
+                    }
+
+                    // 3. Click Seek-to-Live if the stream is behind live edge
+                    const seekLive = document.querySelector('button.vjs-seek-to-live-control:not(.vjs-at-live-edge)');
+                    if (seekLive && Date.now() - (window.__charonUsaLiveClick || 0) > 5000) {
+                      window.__charonUsaLiveClick = Date.now();
+                      seekLive.click();
+                    }
+
+                    if (!v.__charonStyled) {
+                      v.__charonStyled = true;
+                      v.style.cssText = [
+                        'background: black !important',
+                        'cursor: none !important',
+                        'display: block !important',
+                        'height: 100vh !important',
+                        'width: 100vw !important',
+                        'left: 0 !important',
+                        'top: 0 !important',
+                        'margin: 0 !important',
+                        'max-height: none !important',
+                        'max-width: none !important',
+                        'object-fit: fill !important',
+                        'position: fixed !important',
+                        'z-index: 2147483647 !important'
+                      ].join('; ');
+                    }
+                  };
+
+                  checkPlayer();
+                  if (window.__charonTunerActive) return;
+                  window.__charonTunerActive = true;
+                  setInterval(checkPlayer, 300);
+                })();
+                """;
+            File.WriteAllText(tuneJsPath, usaTuneJs, new UTF8Encoding(false));
+        }
 
         List<ProviderChannel> channels = [];
         try
@@ -1566,8 +2136,9 @@ public class ProviderManager
         (providerId.Equals("youtubetv", StringComparison.OrdinalIgnoreCase) ||
          providerId.Equals("spectrum", StringComparison.OrdinalIgnoreCase) ||
          providerId.Equals("xfinity", StringComparison.OrdinalIgnoreCase) ||
-		  providerId.Equals("philo", StringComparison.OrdinalIgnoreCase) ||
-         providerId.Equals("sling", StringComparison.OrdinalIgnoreCase));
+		 providerId.Equals("philo", StringComparison.OrdinalIgnoreCase) ||
+		 providerId.Equals("sling", StringComparison.OrdinalIgnoreCase) ||
+         providerId.Equals("nbc", StringComparison.OrdinalIgnoreCase));
 
     public static List<ProviderChannel> ParseChannelsJson(string json)
     {

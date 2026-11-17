@@ -1,0 +1,54 @@
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  overflow: hidden !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                }
+
+                /* Keep the video player container and its ancestors free of transform/contain traps */
+                *:has(video) {
+                  transform: none !important;
+                  contain: none !important;
+                }
+
+                video {
+                  position: fixed !important;
+                  inset: 0 !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  margin: 0 !important;
+                  max-width: none !important;
+                  max-height: none !important;
+                  object-fit: fill !important;
+                  z-index: 2147483647 !important;
+                  background: #000 !important;
+                  cursor: none !important;
+                  opacity: 1 !important;
+                }
+
+                /* Hide the lower guide grid, filter bar, footer, and player HUD with opacity: 0
+                   so NBC's layout/measurement math runs at full speed while rendering pitch-black */
+                section.links-selectable-group,
+                .live-page__links-selectable-group,
+                .livePage__filter,
+                .live-guide__wrapper,
+                .live-guide__nav,
+                .live-guide__schedules,
+                .live-guide__streams,
+                .live-guide__inner,
+                footer.footer,
+                .footer,
+                #onetrust-consent-sdk,
+                .video-overlay,
+                .brand-header,
+                .video-player__controls,
+                [class*="header" i],
+                [class*="controls" i] {
+                  opacity: 0 !important;
+                  pointer-events: none !important;
+                }

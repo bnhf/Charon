@@ -1,0 +1,8 @@
+{
+  "id": "aetv",
+  "name": "A\u0026E (TVE)",
+  "groupTitle": "A\u0026E (TVE)",
+  "enabled": true,
+  "loginUrl": "https://play.aetv.com/live",
+  "tuneScriptDelayMs": 1500
+}

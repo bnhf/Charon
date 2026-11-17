@@ -1,0 +1,48 @@
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  cursor: none !important;
+}
+
+*:has(video) {
+  transform: none !important;
+  contain: none !important;
+}
+
+video, video#epg-player_html5_api, .vjs-tech {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: fill !important;
+  z-index: 2147483647 !important;
+  background: #000 !important;
+  cursor: none !important;
+  opacity: 1 !important;
+}
+
+/* Hide non-player page modules, headers/footers, and Video.js overlays */
+.module-loader-wrapper:not(:has(video)),
+header, footer, nav,
+.vjs-control-bar,
+.vjs-big-play-button,
+.vjs-title-bar,
+.vjs-poster,
+.vjs-loading-spinner,
+.vjs-text-track-display,
+.vjs-text-track-display-ttml,
+.vjs-modal-dialog,
+.tvProviderImage,
+#onetrust-consent-sdk {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

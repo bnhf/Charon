@@ -1,0 +1,18 @@
+[
+  {
+    "id": "usa-east",
+    "name": "USA Network (East)",
+    "channelNumber": "245",
+    "stationId": "58452",
+    "url": "https://www.usanetwork.com/live",
+    "isHidden": false
+  },
+  {
+    "id": "usa-west",
+    "name": "USA Network (West)",
+    "channelNumber": "246",
+    "stationId": "74030",
+    "url": "https://www.usanetwork.com/live",
+    "isHidden": true
+  }
+]

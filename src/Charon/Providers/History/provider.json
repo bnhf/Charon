@@ -1,0 +1,8 @@
+{
+  "id": "history",
+  "name": "History (TVE)",
+  "groupTitle": "History (TVE)",
+  "enabled": true,
+  "loginUrl": "https://play.history.com/live",
+  "tuneScriptDelayMs": 1500
+}

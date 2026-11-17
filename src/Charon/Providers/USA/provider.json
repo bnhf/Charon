@@ -1,0 +1,8 @@
+{
+  "id": "usa",
+  "name": "USA Network (TVE)",
+  "groupTitle": "USA Network (TVE)",
+  "enabled": true,
+  "loginUrl": "https://www.usanetwork.com/live",
+  "tuneScriptDelayMs": 1500
+}

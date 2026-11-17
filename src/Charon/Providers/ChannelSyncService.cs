@@ -19,7 +19,8 @@ public class ChannelSyncService
          providerId.Contains("spectrum", StringComparison.OrdinalIgnoreCase) ||
          providerId.Contains("xfinity", StringComparison.OrdinalIgnoreCase) ||
 		 providerId.Contains("philo", StringComparison.OrdinalIgnoreCase) ||
-         providerId.Contains("sling", StringComparison.OrdinalIgnoreCase));
+		 providerId.Contains("sling", StringComparison.OrdinalIgnoreCase) ||
+         providerId.Contains("nbc", StringComparison.OrdinalIgnoreCase));
 
     public static async Task<(List<ProviderChannel> Channels, int MatchedCount)> ScanAndMatchAsync(
         CharonConfig config,
@@ -86,6 +87,7 @@ public class ChannelSyncService
         bool isXfinity = provider.Manifest.Id.Contains("xfinity", StringComparison.OrdinalIgnoreCase);
         bool isSling = provider.Manifest.Id.Contains("sling", StringComparison.OrdinalIgnoreCase);
 		bool isPhilo = provider.Manifest.Id.Contains("philo", StringComparison.OrdinalIgnoreCase);
+		bool isNbc = provider.Manifest.Id.Contains("nbc", StringComparison.OrdinalIgnoreCase);
 		string targetUrl = isSpectrum
             ? "https://watch.spectrum.net/guide"
             : isXfinity
@@ -95,6 +97,8 @@ public class ChannelSyncService
 			: isPhilo
             // Start on Home, not the guide: the scraper must hook fetch before the guide's first request
             ? "https://www.philo.com/player/mytv"
+			: isNbc 
+			? "https://www.nbc.com/live"
             : "https://tv.youtube.com/live";
 
         int posX = config.WindowPlacement == WindowPlacementMode.VisibleDebug ? 80 : -3200;
@@ -243,6 +247,32 @@ public class ChannelSyncService
                     await Task.Delay(1500);
                 }
 
+                return [];
+            }
+			else if (isNbc)
+            {
+                string nbcJs = GetNbcScraperJs();
+                var deadline = DateTime.UtcNow.AddSeconds(20);
+                
+                while (DateTime.UtcNow < deadline)
+                {
+                    statusCallback($"Step 1/2: Resolving local NBC affiliate via geolocation...");
+                    string? res = await EvaluateJsStringAsync(ws, 1, nbcJs);
+                    
+                    if (!string.IsNullOrWhiteSpace(res))
+                    {
+                        if (res.StartsWith("{\"status\":", StringComparison.Ordinal))
+                        {
+                            log($"[Sync] {res}");
+                        }
+                        else if (res.StartsWith("[", StringComparison.Ordinal) && res != "[]")
+                        {
+                            var parsed = ProviderManager.ParseChannelsJson(res);
+                            if (parsed.Count > 0) return parsed;
+                        }
+                    }
+                    await Task.Delay(1000);
+                }
                 return [];
             }
             else
@@ -894,6 +924,63 @@ public class ChannelSyncService
 
           return JSON.stringify(results);
         })()
+        """;
+		
+		private static string GetNbcScraperJs() => """
+        (async () => {
+          // Wait for Chrome to actually navigate to nbc.com before attempting the API fetch
+          if (!location.hostname.includes('nbc.com')) {
+            return JSON.stringify({ status: 'waiting_for_page' });
+          }
+
+          const results = [
+            // Hardcode known Gracenote IDs for National feeds so Charon skips searching them
+            { Id: "bravo-east", Name: "Bravo (East)", ChannelNumber: "210", StationId: "99936", Url: "https://www.nbc.com/live?brand=bravo&callsign=BRAVOHD" },
+            { Id: "bravo-west", Name: "Bravo (West)", ChannelNumber: "211", StationId: "102960", Url: "https://www.nbc.com/live?brand=bravo&callsign=BRAVOHP" },
+            { Id: "nbc-universo-east", Name: "NBC Universo (East)", ChannelNumber: "215", StationId: "96713", Url: "https://www.nbc.com/live?brand=nbc-universo&callsign=UNVSOHD" },
+            { Id: "nbc-universo-west", Name: "NBC Universo (West)", ChannelNumber: "216", StationId: "102959", Url: "https://www.nbc.com/live?brand=nbc-universo&callsign=UVSPHST" },
+            // Free / FAST
+            { Id: "nbc-news-now", Name: "NBC News NOW", ChannelNumber: "220", StationId: "114174", Url: "https://www.nbc.com/live?brand=nbc-news&callsign=NBCNN" },
+            { Id: "nbc-sports-now", Name: "NBC Sports Now", ChannelNumber: "221", StationId: "114140", Url: "https://www.nbc.com/live?brand=nbc-sports-now&callsign=PK22" }
+          ];
+
+          try {
+            const r = await fetch('https://geolocation.digitalsvc.apps.nbcuni.com/geolocation/live/nbc', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json', 
+                'Accept': 'application/media.geo-v2+json',
+                'client': 'oneapp', 
+                'authorization': 'NBC-Basic key="nbc_live", version="3.0", type="cpc"' 
+              },
+              body: JSON.stringify({ adobeMvpdId: null, device: 'web' })
+            });
+            
+            if (r.ok) {
+              const data = await r.json();
+              const callSign = data?.localizedChannelInfo?.geoChannel;
+              if (callSign) {
+                const call = callSign.toUpperCase();
+                results.unshift({
+                  Id: "nbc-local",
+                  Name: call,
+                  ChannelNumber: "204",
+                  StationId: "", 
+                  Url: `https://www.nbc.com/live?brand=nbc&callsign=${call}`
+                });
+              }
+              return JSON.stringify(results);
+            }
+          } catch (e) {}
+
+          window.__charonNbcGeoAttempts = (window.__charonNbcGeoAttempts || 0) + 1;
+          if (window.__charonNbcGeoAttempts > 10) {
+            // Give up and return just the national channels if geolocation fails for 10 straight seconds
+            return JSON.stringify(results);
+          }
+
+          return JSON.stringify({ status: 'fetching_geo_data' });
+        })();
         """;
 		
     // Direct, verified Gracenote TMS StationId table (East/Central/Mountain ID, Pacific ID)

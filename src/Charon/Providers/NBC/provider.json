@@ -1,0 +1,8 @@
+{
+  "id": "nbc",
+  "name": "NBCUniversal TVE",
+  "groupTitle": "NBCUniversal TVE",
+  "enabled": true,
+  "loginUrl": "https://www.nbc.com/live",
+  "tuneScriptDelayMs": 1000
+}
