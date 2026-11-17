@@ -19,6 +19,7 @@ public class ChannelSyncService
          providerId.Contains("spectrum", StringComparison.OrdinalIgnoreCase) ||
          providerId.Contains("xfinity", StringComparison.OrdinalIgnoreCase) ||
 		 providerId.Contains("philo", StringComparison.OrdinalIgnoreCase) ||
+         providerId.Contains("hulu", StringComparison.OrdinalIgnoreCase) ||
 		 providerId.Contains("sling", StringComparison.OrdinalIgnoreCase) ||
          providerId.Contains("nbc", StringComparison.OrdinalIgnoreCase));
 
@@ -88,6 +89,7 @@ public class ChannelSyncService
         bool isSling = provider.Manifest.Id.Contains("sling", StringComparison.OrdinalIgnoreCase);
 		bool isPhilo = provider.Manifest.Id.Contains("philo", StringComparison.OrdinalIgnoreCase);
 		bool isNbc = provider.Manifest.Id.Contains("nbc", StringComparison.OrdinalIgnoreCase);
+        bool isHulu = provider.Manifest.Id.Contains("hulu", StringComparison.OrdinalIgnoreCase);
 		string targetUrl = isSpectrum
             ? "https://watch.spectrum.net/guide"
             : isXfinity
@@ -99,6 +101,8 @@ public class ChannelSyncService
             ? "https://www.philo.com/player/mytv"
 			: isNbc 
 			? "https://www.nbc.com/live"
+            : isHulu
+            ? "https://www.hulu.com/live"
             : "https://tv.youtube.com/live";
 
         int posX = config.WindowPlacement == WindowPlacementMode.VisibleDebug ? 80 : -3200;
@@ -273,6 +277,38 @@ public class ChannelSyncService
                     }
                     await Task.Delay(1000);
                 }
+                return [];
+            }
+            else if (isHulu)
+            {
+                // Hulu: read the live guide's full channel list from the web app's Redux store
+                string huluJs = GetHuluScraperJs();
+                var deadline = DateTime.UtcNow.AddSeconds(45);
+                int attempt = 0;
+
+                while (DateTime.UtcNow < deadline)
+                {
+                    attempt++;
+                    statusCallback($"Step 1/2: Waiting for Hulu live guide to load (attempt {attempt})...");
+                    string? res = await EvaluateJsStringAsync(ws, attempt, huluJs);
+
+                    if (!string.IsNullOrWhiteSpace(res))
+                    {
+                        if (res.StartsWith("{\"status\":", StringComparison.Ordinal))
+                        {
+                            log($"[Sync] {res}");
+                        }
+                        else if (res.StartsWith("[", StringComparison.Ordinal) && res != "[]")
+                        {
+                            var parsed = ProviderManager.ParseChannelsJson(res);
+                            if (parsed.Count > 0)
+                                return parsed;
+                        }
+                    }
+
+                    await Task.Delay(1500);
+                }
+
                 return [];
             }
             else
@@ -983,6 +1019,49 @@ public class ChannelSyncService
         })();
         """;
 		
+    private static string GetHuluScraperJs() => """
+        (async () => {
+          const status = (s, extra) => JSON.stringify(Object.assign({ status: s, url: location.origin + location.pathname }, extra || {}));
+
+          if (!/(^|\.)hulu\.com$/i.test(location.hostname)) return status('waiting_for_hulu');
+
+          if (!location.pathname.startsWith('/live')) {
+            if (/^\/(welcome|login|signup)/i.test(location.pathname)) return status('not_logged_in');
+            if (location.pathname.startsWith('/profiles')) return status('waiting_for_profile_picker');
+            location.href = 'https://www.hulu.com/live';
+            return status('navigating_to_live');
+          }
+
+          // The live guide keeps its channel lists in the app's Redux store (window.store). "hulu:guide:all-channels"
+          // is the guide's Channels tab: every channel in the subscription, locals included (named by call sign).
+          // Its channelId is the same id a /watch/<id> link takes, which redirects to whatever is airing now.
+          let live = null;
+          try { live = window.store && window.store.getState().LevelOne.live; } catch (e) {}
+          const cols = (live && live.collections) || [];
+          const all = cols.find((c) => c.collectionId === 'hulu:guide:all-channels');
+          if (!all || !Array.isArray(all.channels) || all.channels.length === 0) return status('waiting_for_guide');
+
+          const results = [];
+          const seen = new Set();
+          for (const c of all.channels) {
+            const id = String(c.channelId || '').toLowerCase();
+            const name = String(c.channelName || '').trim();
+            if (!/^[0-9a-f-]{36}$/.test(id) || !name || seen.has(id)) continue;
+            seen.add(id);
+
+            results.push({
+              Id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${id.slice(0, 8)}`,
+              Name: name,
+              ChannelNumber: '',
+              StationId: '',
+              Url: `https://www.hulu.com/watch/${id}`
+            });
+          }
+
+          return JSON.stringify(results);
+        })()
+        """;
+
     // Direct, verified Gracenote TMS StationId table (East/Central/Mountain ID, Pacific ID)
     // Bypasses fuzzy text search completely for core national networks!
     private static readonly Dictionary<string, (string EastId, string WestId)> VerifiedGracenoteStationIds =
@@ -1033,6 +1112,7 @@ public class ChannelSyncService
         { "A&E",                        ("51529",  "73992") },
         { "Arts and Entertainment",     ("51529",  "73992") },
         { "History",                    ("57708",  "73993") },
+        { "The HISTORY Channel",        ("57708",  "73993") },
         { "Lifetime",                   ("60150",  "73997") },
         { "Lifetime Networks",          ("60150",  "73997") },
         { "LMN",                        ("55887",  "55887") },
@@ -1074,6 +1154,7 @@ public class ChannelSyncService
         { "Comet",                      ("97051",  "97051") },
         { "CHARGE!",                    ("102148", "102148") },
         { "Cozi",                       ("89994",  "89994") },
+        { "Cozi TV",                    ("89994",  "89994") },
         { "Start TV",                   ("109454", "109454") },
         { "Start TV Network",           ("109454", "109454") },
         { "Dabl",                       ("112157", "112157") },
@@ -1248,14 +1329,25 @@ public class ChannelSyncService
             string rawName = ch.Name.Trim();
             TmsStation? match = null;
 
+            // Hulu titles separate feeds "TBS (East)" / "TBS (West)": look up the base name and take that feed's ID
+            string lookupName = rawName;
+            bool useWestFeed = preferPacific;
+            var feedMatch = System.Text.RegularExpressions.Regex.Match(
+                rawName, @"^(.+?)\s*\((East|West)\)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (feedMatch.Success)
+            {
+                lookupName = feedMatch.Groups[1].Value.Trim();
+                useWestFeed = feedMatch.Groups[2].Value.Equals("West", StringComparison.OrdinalIgnoreCase);
+            }
+
             var xfMatch = System.Text.RegularExpressions.Regex.Match(ch.Url ?? "", @"/stream/live/([^/]+)/\d+/");
             string? urlCallSign = xfMatch.Success ? Uri.UnescapeDataString(xfMatch.Groups[1].Value) : null;
 
             // 1. Check Verified National Network Gracenote StationId table first (by display name, then by Xfinity URL callSign)
-            if (VerifiedGracenoteStationIds.TryGetValue(rawName, out var verifiedIds) ||
+            if (VerifiedGracenoteStationIds.TryGetValue(lookupName, out var verifiedIds) ||
                 (!string.IsNullOrWhiteSpace(urlCallSign) && VerifiedGracenoteStationIds.TryGetValue(urlCallSign, out verifiedIds)))
             {
-                ch.StationId = preferPacific ? verifiedIds.WestId : verifiedIds.EastId;
+                ch.StationId = useWestFeed ? verifiedIds.WestId : verifiedIds.EastId;
                 updatedCount++;
                 log($"[Gracenote] [OK] {ch.Name} -> Verified US HD [StationId: {ch.StationId}]");
                 continue;
@@ -1297,8 +1389,8 @@ public class ChannelSyncService
             // 5. Fallback: Search by raw display name for remaining national/FAST networks
             if (match is null)
             {
-                var results = await QueryChannelsDvrTmsAsync(serverUrl, rawName);
-                match = SelectBestTmsStation(results, null, rawName, preferPacific);
+                var results = await QueryChannelsDvrTmsAsync(serverUrl, lookupName);
+                match = SelectBestTmsStation(results, null, lookupName, useWestFeed);
             }
 
             if (match is not null && !string.IsNullOrWhiteSpace(match.StationId))
