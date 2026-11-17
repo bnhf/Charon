@@ -610,7 +610,7 @@ public sealed class ChromeTuner
 
         string exePath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Charon.exe");
         DateTime buildUtc = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.UtcNow;
-        string extVersion = $"38.{buildUtc.Month * 100 + buildUtc.Day}.{buildUtc.Hour * 100 + buildUtc.Minute}.{buildUtc.Second}";
+        string extVersion = $"39.{buildUtc.Month * 100 + buildUtc.Day}.{buildUtc.Hour * 100 + buildUtc.Minute}.{buildUtc.Second}";
 
         string keyFile = Path.Combine(baseExtDir, "rsa_spki_v20.b64");
         byte[] spkiBytes;
