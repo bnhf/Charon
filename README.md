@@ -50,8 +50,14 @@ Charon supports six major streaming providers out of the box:
    - **Philo**
    - **Hulu + Live TV**
  4. Or select network TVE provider:
-   - **Warner-Discovery**
-   - **CNN**
+    - **Warner-Discovery**
+    - **CNN**
+    - **A&E**
+    - **History Channel**
+    - **Lifetime**
+    - **USA**
+    - **NBC**
+    - **CNN**
 
 ---
 
