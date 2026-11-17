@@ -1,0 +1,8 @@
+{
+  "id": "fubo",
+  "name": "Fubo",
+  "groupTitle": "Fubo",
+  "enabled": true,
+  "loginUrl": "https://www.fubo.tv/p/home",
+  "tuneScriptDelayMs": 2000
+}

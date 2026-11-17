@@ -20,6 +20,7 @@ public class ChannelSyncService
          providerId.Contains("xfinity", StringComparison.OrdinalIgnoreCase) ||
 		 providerId.Contains("philo", StringComparison.OrdinalIgnoreCase) ||
          providerId.Contains("hulu", StringComparison.OrdinalIgnoreCase) ||
+         providerId.Contains("fubo", StringComparison.OrdinalIgnoreCase) ||
 		 providerId.Contains("sling", StringComparison.OrdinalIgnoreCase) ||
          providerId.Contains("nbc", StringComparison.OrdinalIgnoreCase));
 
@@ -90,6 +91,7 @@ public class ChannelSyncService
 		bool isPhilo = provider.Manifest.Id.Contains("philo", StringComparison.OrdinalIgnoreCase);
 		bool isNbc = provider.Manifest.Id.Contains("nbc", StringComparison.OrdinalIgnoreCase);
         bool isHulu = provider.Manifest.Id.Contains("hulu", StringComparison.OrdinalIgnoreCase);
+        bool isFubo = provider.Manifest.Id.Contains("fubo", StringComparison.OrdinalIgnoreCase);
 		string targetUrl = isSpectrum
             ? "https://watch.spectrum.net/guide"
             : isXfinity
@@ -103,6 +105,9 @@ public class ChannelSyncService
 			? "https://www.nbc.com/live"
             : isHulu
             ? "https://www.hulu.com/live"
+            : isFubo
+            // Start on Home, not the guide: the scraper must hook the guide request before it is sent
+            ? "https://www.fubo.tv/p/home"
             : "https://tv.youtube.com/live";
 
         int posX = config.WindowPlacement == WindowPlacementMode.VisibleDebug ? 80 : -3200;
@@ -291,6 +296,38 @@ public class ChannelSyncService
                     attempt++;
                     statusCallback($"Step 1/2: Waiting for Hulu live guide to load (attempt {attempt})...");
                     string? res = await EvaluateJsStringAsync(ws, attempt, huluJs);
+
+                    if (!string.IsNullOrWhiteSpace(res))
+                    {
+                        if (res.StartsWith("{\"status\":", StringComparison.Ordinal))
+                        {
+                            log($"[Sync] {res}");
+                        }
+                        else if (res.StartsWith("[", StringComparison.Ordinal) && res != "[]")
+                        {
+                            var parsed = ProviderManager.ParseChannelsJson(res);
+                            if (parsed.Count > 0)
+                                return parsed;
+                        }
+                    }
+
+                    await Task.Delay(1500);
+                }
+
+                return [];
+            }
+            else if (isFubo)
+            {
+                // Fubo: capture the guide's own channel-list response (only the account's subscribed channels)
+                string fuboJs = GetFuboScraperJs();
+                var deadline = DateTime.UtcNow.AddSeconds(45);
+                int attempt = 0;
+
+                while (DateTime.UtcNow < deadline)
+                {
+                    attempt++;
+                    statusCallback($"Step 1/2: Waiting for Fubo guide to load (attempt {attempt})...");
+                    string? res = await EvaluateJsStringAsync(ws, attempt, fuboJs);
 
                     if (!string.IsNullOrWhiteSpace(res))
                     {
@@ -1055,6 +1092,85 @@ public class ChannelSyncService
               ChannelNumber: '',
               StationId: '',
               Url: `https://www.hulu.com/watch/${id}`
+            });
+          }
+
+          return JSON.stringify(results);
+        })()
+        """;
+
+    private static string GetFuboScraperJs() => """
+        (async () => {
+          const status = (s, extra) => JSON.stringify(Object.assign({ status: s, url: location.origin + location.pathname }, extra || {}));
+
+          if (!/(^|\.)fubo\.tv$/i.test(location.hostname)) return status('waiting_for_fubo');
+          if (/^\/(?:p\/)?(welcome|signin|login|signup)/i.test(location.pathname)) return status('not_logged_in');
+
+          // The guide's channel list comes from api.fubo.tv/papi/v1/guide/epg (XHR, with auth headers the app adds).
+          // Capture the app's own response rather than calling the API directly. It lists only the channels in the
+          // account's subscription, each as a "channel-cell" whose id is the channel_id that Fubo's channel links take.
+          if (!window.__charonFuboXhrHooked) {
+            window.__charonFuboXhrHooked = true;
+            const origOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function (method, url) {
+              try {
+                if (/\/papi\/v1\/guide\/epg/i.test(String(url))) {
+                  this.addEventListener('load', () => {
+                    try {
+                      const json = JSON.parse(this.responseText);
+                      const cells = (((json.content || {}).epg || {}).components || []).filter((c) => c && c.type === 'channel-cell');
+                      if (cells.length > ((window.__charonFuboCells || []).length)) window.__charonFuboCells = cells;
+                    } catch (e) {}
+                  });
+                }
+              } catch (e) {}
+              return origOpen.apply(this, arguments);
+            };
+          }
+
+          const cells = window.__charonFuboCells;
+          if (!cells || cells.length === 0) {
+            // The scan opens on Home, so the guide's first request happens after the hook is in place.
+            // If the guide was already showing, go Home and back to make it request the lineup again.
+            const now = Date.now();
+            if (now - (window.__charonFuboNavAt || 0) < 4000) return status('waiting_for_guide');
+            window.__charonFuboNavAt = now;
+            const onGuide = /^\/p\/guide/i.test(location.pathname);
+            const nav = document.querySelector(onGuide ? '[data-testid="navigation-home-item"]' : '[data-testid="navigation-guide-item"]');
+            if (nav) { nav.click(); return status(onGuide ? 'reopening_guide' : 'opening_guide'); }
+            return status('waiting_for_fubo_app');
+          }
+
+          const results = [];
+          const seen = new Set();
+          for (const c of cells) {
+            const id = String(c.id || '').trim();
+            const name = String((c.name && c.name.text) || '').trim();
+            if (!/^\d+$/.test(id) || !name || seen.has(id)) continue;
+            seen.add(id);
+
+            // The full guide title (e.g. "ABC (KMGH - Denver)", "Fubo Movies (VOD2LIVE)") is only in the tracking
+            // parameters of the channel's details link
+            let fullName = '';
+            try {
+              const url = ((((c.actions || {}).on_click || [])[0] || {}).endpoint || {}).url || '';
+              const m = url.match(/[?&]trkOriginElement=([^&]*)/);
+              if (m) fullName = decodeURIComponent(m[1].replace(/\+/g, ' ')).trim();
+            } catch (e) {}
+
+            // Name local stations by call sign ("KMGH ABC"), which the Gracenote matcher looks up directly
+            let displayName = name;
+            const local = fullName.match(/\(\s*([WK][A-Z]{2,3})(?:-(?:TV|DT|CD|LD))?\s*[-–]/);
+            if (local) displayName = `${local[1]} ${name}`;
+
+            results.push({
+              Id: `${displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${id}`,
+              Name: displayName,
+              ChannelNumber: '',
+              StationId: '',
+              Url: `https://link.fubo.tv/al1%3Fv%3D1%26a%3Dplay%26t%3Dchannel%26channel_id%3D${id}`,
+              // Fubo's own looping channels have no Gracenote listing; add them hidden, like Sling Freestream
+              IsHidden: /VOD2LIVE/i.test(fullName)
             });
           }
 

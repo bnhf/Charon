@@ -1,0 +1,17 @@
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  cursor: none !important;
+}
+
+/* Fubo's player controls (data-testid="player-*") and the feedback widget. Made invisible rather than removed,
+   so tune.js can still click their buttons. */
+[data-testid^="player-"],
+[data-testid="typeform-embed"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
